@@ -1,0 +1,175 @@
+---
+title: "Fractional Brownian Motion Simulation Methods (H > 0.5)"
+subtitle: "Algorithms, intuition, and runtimes"
+format: 
+  revealjs:
+    theme: simple
+    slide-number: true
+    footer: "Source: Kijima & Tam (2013)"
+    incremental: false
+    toc: false
+---
+
+# Scope
+
+- Focus: fBM with $H>0.5$ (long memory).  
+- Goal: state each simulation method with exact formulas, then compare runtimes.  
+- Notation: fGn increments $Z_k$, fBM path $B_H(t)=\sum_{i\le t} Z_i$.
+
+---
+
+# Preliminaries {.smaller}
+
+**fBM definition**  
+$$\mathbb E[B_H(t)B_H(s)] = \tfrac12\left( t^{2H} + s^{2H} - |t-s|^{2H}\right).$$
+
+**fGn autocovariance**  
+$$\gamma_H(n)=\tfrac12\Big((n+1)^{2H} + (n-1)^{2H} - 2n^{2H}\Big).$$
+
+**Long memory for $H>1/2$**  
+$$\gamma_H(n)\sim H(2H-1)\,n^{2H-2} \quad\Rightarrow\quad \sum_n \gamma_H(n)=\infty.$$
+
+---
+
+
+# Method 2 — Cholesky (exact) {.smaller}
+
+**Idea:** factor $\Gamma=L L^\top$, draw $Z=L V$ with $V\sim\mathcal N(0,I)$.
+
+Entries:
+$$
+L_{i,0}=\frac{\gamma(i)}{L_{0,0}},\quad
+L_{i,j}=\frac{\gamma(i-j)-\sum_{k=0}^{j-1} L_{i,k}L_{j,k}}{L_{j,j}},\ j>0,\quad
+L_{i,i}^2=\gamma(0)-\sum_{k=0}^{i-1}L_{i,k}^2.
+$$
+
+Covariance preserved:
+$$
+\mathrm{Cov}(Z)=L\,\mathrm{Cov}(V)\,L^\top=LL^\top=\Gamma.
+$$
+
+**Intuition:** geometric “square root” of covariance then rotate i.i.d. normals.
+
+**Cost:** $O(N^3)$ time, $O(N^2)$ space. Suitable only for small $N$.
+
+---
+
+# Method 3 — FFT / Circulant Embedding (exact for fGn) {.smaller}
+
+**Idea:** embed Toeplitz $\Gamma$ in a larger circulant $C$, diagonalize by FFT.
+
+Build $C$ of size $M=2N$ from first row $[\,\gamma(0),\ldots,\gamma(N-1),0,\gamma(N-1),\ldots,\gamma(1)\,]$.  
+DFT matrix $Q$ with
+$$
+Q_{jk}=\frac{1}{\sqrt{M}}\exp\!\left(-\frac{2\pi i\,jk}{M}\right),\quad
+C=Q\Lambda Q^*,\ \ \lambda_k=\sum_{j=0}^{M-1} c_j \exp\!\left(\frac{2\pi i\,jk}{M}\right).
+$$
+
+Generate
+$$
+Z_{0:N-1}=\text{IFFT}\big(\sqrt{\Lambda}\odot \text{FFT}(U)\big)_{0:N-1},\quad U\sim\mathcal N(0,I_M).
+$$
+
+Then $B_H(t)=\sum_{i\le t} Z_i$. If any $\lambda_k<0$, increase $M$.
+
+**Intuition:** circulant matrices are diagonal in Fourier basis, so sampling is elementwise.
+
+**Cost:** $O(N\log N)$ time, $O(N)$ space.
+
+---
+
+# Method 4 — Correlated Random Walk (approximate) {.smaller}
+
+Define correlated walk with persistence $p$ and increments $\epsilon_n\in\{\pm1\}$:
+$$\mathbb P(\epsilon_{n+1}=\epsilon_n\mid \mathcal F_n)=p,\qquad
+\mathbb E[\epsilon_m\epsilon_{m+n}]=(2p-1)^n.$$
+
+Randomize $p\sim\mu_H$ on $(\tfrac12,1)$ with density $(1-H)2^{3-2H}(1-p)^{1-2H}$.  
+Average $M$ i.i.d. walks and scale:
+$$
+\frac{c_H}{N^H M}\sum_{j=1}^{M} X^{(j)}_{\lfloor Nt\rfloor}\ \xRightarrow[N\to\infty]{\ \ } \ B_H(t),\qquad
+c_H=\frac{H(2H-1)}{\Gamma(3-2H)}.
+$$
+
+Berry–Esseen control for finite $M(N)$:
+$$
+\text{error}\ \lesssim\ 0.65\,D_H\,\frac{N^{1-H}}{k\,M},\quad
+D_H=\frac{6(2H-1)}{(H+1)(2H+1)}.
+$$
+
+**Intuition:** fBM is a scaling limit of aggregated persistent walks.
+
+**Cost:** $M=O(N^{2-2H})$ walks $\Rightarrow$ sublinear to linear cost depending on $H$.
+
+---
+
+# Method 5 — Random Midpoint Displacement, RMD$(m,n)$ {.smaller}
+
+Bisection identity at level $i$:
+$$X_{i,2j-1}+X_{i,2j}=X_{i-1,j}.$$
+
+Condition the “odd” increment on local neighbors
+$$
+X_{i,2k+1}=\underbrace{\mathbb E\!\left[X_{i,2k+1}\mid \mathbf X_{\text{left m}},\mathbf X_{\text{right n}}\right]}_{\displaystyle e(i,k)\,\cdot}\
++\ \underbrace{\mathrm{Var}^{1/2}\!\left[X_{i,2k+1}\mid \cdots\right]}_{v(i,k)}\,U_{i,k},
+$$
+where for the Gaussian vector with covariance block
+$$
+\Gamma_{ik}=
+\begin{pmatrix}
+\mathrm{Var}(X_{i,2k+1}) & \Gamma^{(1,2)}_{ik}\\[2pt]
+\Gamma^{(2,1)}_{ik} & \Gamma^{(2,2)}_{ik}
+\end{pmatrix},\quad
+e(i,k)=\Gamma^{(1,2)}_{ik}\,(\Gamma^{(2,2)}_{ik})^{-1},\quad
+v(i,k)=\frac{|\Gamma_{ik}|}{|\Gamma^{(2,2)}_{ik}|}.
+$$
+
+On-the-fly variant: fix resolution $\delta$, expand horizon by doubling, reuse local conditioning.
+
+**Intuition:** far points have weak impact; local conditioning captures most covariance cheaply.
+
+**Cost:** $O((m+n)N)$ time, near-$O(1)$ extra memory; boundary tuning needed.
+
+---
+
+# Method 6 — Spectral (approximate) {.smaller}
+
+Approximate fGn spectral density
+$$
+f(\lambda)=2\sin(\pi H)\,\Gamma(2H+1)\,(1-\cos\lambda)\,|\lambda|^{-2H-1}+B(\lambda,H),\quad \lambda\in[-\pi,\pi],
+$$
+with Paxson’s correction $B(\lambda,H)\approx \widetilde B_3(\lambda,H)$ using rational terms in
+$a_k=2k\pi+\lambda$, $b_k=2k\pi-\lambda$, exponents $d=-2H-1$, $d'=-2H$ and empirical refinement.
+
+Sample frequency coefficients and IFFT:
+$$
+\hat X_k = \sqrt{\tfrac{f(\lambda_k)}{2}}\,(U_k+iV_k),\quad X=\mathrm{IFFT}(\hat X),\quad B_H(t)=\sum_{i\le t} X_i.
+$$
+
+**Intuition:** draw energy at each frequency to match long-memory spectrum, then invert.
+
+**Cost:** $O(N\log N)$ time, $O(N)$ space; accuracy depends on $B(\lambda,H)$ approximation.
+
+---
+
+# Runtimes and Use {.smaller}
+
+| Method | Type | Time | Space | Notes |
+|---|---|---|---|---|
+| Hosking | exact | $O(N^2)$ | $O(N^2)$ | simple, on-path; slow for large $N$ |
+| Cholesky | exact | $O(N^3)$ | $O(N^2)$ | only tiny $N$ |
+| FFT/CEM | exact fGn | $O(N\log N)$ | $O(N)$ | industry default for large $N$ |
+| Corr. RW | approx | $M=O(N^{2-2H})$ | $O(N)$ | theory-friendly; slower if $H\downarrow 0.5$ |
+| RMD$(m,n)$ | approx | $O((m+n)N)$ | $O(1)$ | streaming; tune $(m,n)$ |
+| Spectral | approx | $O(N\log N)$ | $O(N)$ | fastest; needs $B(\lambda,H)$ fix |
+
+**Rules of thumb:** small $N$ use Hosking; large $N$ use FFT; streaming or unknown horizon use RMD; need fastest bulk paths use Spectral and validate moments.
+
+---
+
+# Implementation tips {.smaller}
+
+- Precompute $\gamma(k)$ once.  
+- For FFT, pad to $M=2N$ and ensure $\lambda_k\ge 0$; if not, enlarge $M$.  
+- Validate by sample ACF and variance scaling $t^{2H}$.  
+- For RMD, increase $(m,n)$ until the ACF error is acceptable on lags of interest.

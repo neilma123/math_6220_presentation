@@ -1,0 +1,1226 @@
+
+```{r}
+#| context: setup
+
+library(magick)
+
+# ===================================================================
+# fBM SIMULATION METHODS IMPLEMENTATION
+# ===================================================================
+# This section implements all 6 methods for simulating Fractional Brownian Motion:
+# 
+# 1. HOSKING ALGORITHM: Sequential conditioning on past values
+#    - Time: O(N²), Space: O(N²)
+#    - Best for: Small samples (N < 5,000)
+#    - Exact method capturing full covariance
+#
+# 2. CHOLESKY DECOMPOSITION: Direct matrix factorization
+#    - Time: O(N³), Space: O(N²)
+#    - Best for: Small samples (N < 1,000)
+#    - Simplest and most intuitive exact method
+#
+# 3. FFT (CIRCULANT EMBEDDING): Circulant matrix via FFT
+#    - Time: O(N log N), Space: O(N)
+#    - Best for: Large samples (N > 5,000)
+#    - Industry standard; near-exact with boundary corrections
+#
+# 4. CORRELATED RANDOM WALK: Aggregation-based approximation
+#    - Time: O(N^{2-2H}), Space: O(N)
+#    - Best for: Theory, error control, streaming
+#    - Approximates covariance asymptotically
+#
+# 5. RANDOM MIDPOINT DISPLACEMENT: Bisection with local conditioning
+#    - Time: O(N), Space: O(1) worst-case
+#    - Best for: Streaming/unknown horizon
+#    - Exact conditioning on local neighborhood
+#
+# 6. SPECTRAL METHOD: Frequency-domain approximation via FFT
+#    - Time: O(N log N), Space: O(N)
+#    - Best for: Very large N, speed critical
+#    - ~4x faster than FFT with Paxson's spectral density approx
+# ===================================================================
+
+
+generate_fbm_hosking <- function(n, H) {
+  # Compute autocovariance
+  gamma <- function(k) {
+    if (k == 0) return(1)
+    0.5 * (abs(k + 1)^(2*H) - 2*abs(k)^(2*H) + abs(k - 1)^(2*H))
+  }
+  
+  Z <- numeric(n)
+  Z[1] <- rnorm(1)
+  
+  if (n == 1) return(cumsum(Z))
+  
+  # Build covariance matrix incrementally
+  cov_matrix <- matrix(0, n, n)
+  cov_matrix[1, 1] <- 1
+  
+  for (i in 1:(n-1)) {
+    # Build i x i covariance matrix
+    for (j in 1:i) {
+      for (k in 1:i) {
+        cov_matrix[j, k] <- gamma(abs(j - k))
+      }
+    }
+    
+    # Conditional mean and variance
+    c_vec <- sapply(1:i, function(k) gamma(k + 1))
+    
+    cov_inv <- tryCatch(
+      solve(cov_matrix[1:i, 1:i]),
+      error = function(e) solve(cov_matrix[1:i, 1:i] + diag(1e-8, i))
+    )
+    
+    mu <- as.numeric(crossprod(c_vec, cov_inv %*% Z[1:i]))
+    sigma2 <- 1 - as.numeric(crossprod(c_vec, cov_inv %*% c_vec))
+    sigma2 <- max(sigma2, 1e-8)
+    
+    Z[i + 1] <- mu + sqrt(sigma2) * rnorm(1)
+  }
+  
+  cumsum(Z)
+}
+
+# ===================================================================
+# METHOD 2: CHOLESKY DECOMPOSITION
+# ===================================================================
+generate_fbm_cholesky <- function(n, H) {
+  # Create covariance matrix
+  cov_matrix <- matrix(0, n, n)
+  for (i in 1:n) {
+    for (j in 1:n) {
+      cov_matrix[i, j] <- 0.5 * (abs(i - j + 1)^(2*H) - 
+                                  2*abs(i - j)^(2*H) + 
+                                  abs(i - j - 1)^(2*H))
+    }
+  }
+  
+  # Cholesky decomposition
+  L <- tryCatch(
+    chol(cov_matrix),
+    error = function(e) {
+      chol(cov_matrix + diag(1e-6, n))
+    }
+  )
+  
+  # Generate standard normal increments
+  Z <- rnorm(n)
+  
+  # Generate FBM
+  fbm <- crossprod(L, Z)
+  cumsum(as.vector(fbm))
+}
+
+# ===================================================================
+# METHOD 3: FFT (CIRCULANT EMBEDDING METHOD)
+# ===================================================================
+generate_fbm_fft <- function(n, H) {
+  gamma <- function(k) {
+    if (k == 0) return(1)
+    0.5 * (abs(k + 1)^(2*H) - 2*abs(k)^(2*H) + abs(k - 1)^(2*H))
+  }
+  
+  # Extend to power of 2
+  M <- 2^ceiling(log2(2*n))
+  
+  # Build circulant covariance
+  circ_cov <- c(sapply(0:(n-1), gamma), rep(0, M - n))
+  circ_cov[(M-n+1):M] <- sapply((n-1):1, gamma)
+  
+  # FFT of first row
+  lambda <- Re(fft(circ_cov))
+  
+  # Ensure positive (adjust if needed)
+  if (any(lambda < -1e-10)) {
+    M <- 2 * M
+    circ_cov <- c(sapply(0:(n-1), gamma), rep(0, M - n))
+    circ_cov[(M-n+1):M] <- sapply((n-1):1, gamma)
+    lambda <- Re(fft(circ_cov))
+  }
+  
+  # Take square root
+  sqrt_lambda <- sqrt(pmax(lambda, 0))
+  
+  # Generate samples
+  U <- rnorm(M)
+  U_fft <- fft(U)
+  Z_fft <- sqrt_lambda * U_fft
+  Z <- Re(fft(Z_fft, inverse = TRUE)) / M
+  
+  cumsum(Z[1:n])
+}
+
+# ===================================================================
+# METHOD 4: CORRELATED RANDOM WALK (Approximate)
+# ===================================================================
+generate_fbm_crw <- function(n, H, M = NULL) {
+  if (is.null(M)) {
+    # Heuristic for aggregation level
+    M <- max(2, floor(sqrt(n / (1 - H))))
+  }
+  
+  # Generate M correlated sequences
+  X <- matrix(0, n, M)
+  
+  for (j in 1:M) {
+    # Generate uniform random variables
+    U <- runif(n)
+    
+    # Transform to get correlated increments
+    mu_vec <- (1 - U)^(1 / (2 - 2*H))
+    
+    # Apply sign randomness
+    signs <- sample(c(-1, 1), n, replace = TRUE)
+    X[, j] <- cumsum(signs * mu_vec)
+  }
+  
+  # Average and scale
+  c_H <- sqrt(pi * H / sin(pi * H)) * 2^H
+  fbm_approx <- c_H * rowMeans(X)
+  
+  fbm_approx
+}
+
+# ===================================================================
+# METHOD 5: RANDOM MIDPOINT DISPLACEMENT (RMD)
+# ===================================================================
+generate_fbm_rmd <- function(n, H, m = 10, n_neighbors = 10) {
+  gamma <- function(k) {
+    if (k == 0) return(1)
+    0.5 * (abs(k + 1)^(2*H) - 2*abs(k)^(2*H) + abs(k - 1)^(2*H))
+  }
+  
+  # Bisection-based approach
+  result <- numeric(n)
+  result[1] <- 0
+  
+  if (n == 1) return(result)
+  
+  result[n] <- rnorm(1)
+  
+  # Recursive bisection
+  bisect_fill <- function(left, right, result) {
+    if (right - left < 2) return(result)
+    
+    mid <- (left + right) %/% 2
+    
+    # Determine neighbors
+    n_left <- min(n_neighbors, mid - left)
+    n_right <- min(n_neighbors, right - mid)
+    
+    left_idx <- max(left, mid - n_left)
+    right_idx <- min(right, mid + n_right)
+    
+    neighbor_idx <- c(left_idx:(mid-1), (mid+1):right_idx)
+    neighbor_vals <- result[neighbor_idx]
+    
+    if (length(neighbor_idx) > 0) {
+      neighbor_distances <- abs(neighbor_idx - mid)
+      
+      # Build covariance
+      cov_mat <- matrix(0, length(neighbor_idx) + 1, length(neighbor_idx) + 1)
+      for (i in 1:(length(neighbor_idx)+1)) {
+        for (j in 1:(length(neighbor_idx)+1)) {
+          if (i == length(neighbor_idx) + 1 & j == length(neighbor_idx) + 1) {
+            cov_mat[i, j] <- 1
+          } else if (i == length(neighbor_idx) + 1 | j == length(neighbor_idx) + 1) {
+            idx <- if (i == length(neighbor_idx) + 1) j else i
+            cov_mat[i, j] <- gamma(abs(neighbor_idx[idx] - mid))
+          } else {
+            cov_mat[i, j] <- gamma(abs(neighbor_idx[i] - neighbor_idx[j]))
+          }
+        }
+      }
+      
+      # Condition on neighbors
+      cov_inv <- tryCatch(
+        solve(cov_mat[-nrow(cov_mat), -ncol(cov_mat)]),
+        error = function(e) diag(1e-8, nrow(cov_mat) - 1)
+      )
+      
+      mu <- as.numeric(cov_mat[nrow(cov_mat), -ncol(cov_mat)] %*% cov_inv %*% neighbor_vals)
+      sigma2 <- 1 - as.numeric(cov_mat[nrow(cov_mat), -ncol(cov_mat)] %*% cov_inv %*% 
+                               cov_mat[-nrow(cov_mat), ncol(cov_mat)])
+      sigma2 <- max(sigma2, 1e-8)
+      
+      result[mid] <- mu + sqrt(sigma2) * rnorm(1)
+    } else {
+      result[mid] <- rnorm(1)
+    }
+    
+    result <- bisect_fill(left, mid, result)
+    result <- bisect_fill(mid, right, result)
+    result
+  }
+  
+  result <- bisect_fill(1, n, result)
+  cumsum(result)
+}
+
+# ===================================================================
+# METHOD 6: SPECTRAL METHOD (Fast FFT approximation)
+# ===================================================================
+generate_fbm_spectral <- function(n, H) {
+  # Extended to power of 2
+  N <- 2^ceiling(log2(n))
+  
+  # Spectral density approximation for fGn
+  spectral_density <- function(lambda, H) {
+    if (lambda == 0) return(1)
+    # Paxson's approximation
+    term1 <- 2 * sin(pi * H) * gamma(2*H + 1) * (1 - cos(lambda)) * abs(lambda)^(-2*H - 1)
+    term2 <- abs(lambda)^(1 - 2*H) * (1 - cos(lambda))
+    max(term1 + term2, 0)
+  }
+  
+  # Compute spectral density at Fourier frequencies
+  freqs <- 2 * pi * (0:(N-1)) / N
+  spec <- sapply(freqs, function(f) spectral_density(f, H))
+  spec <- pmax(spec, 0)
+  
+  # Generate coefficients
+  a <- complex(N)
+  for (k in 1:(N-1)) {
+    a[k] <- sqrt(spec[k] / N) * (rnorm(1) + 1i * rnorm(1)) / sqrt(2)
+  }
+  a[1] <- sqrt(spec[1] / N) * rnorm(1)
+  
+  # Enforce symmetry for real output
+  for (k in 2:(N/2)) {
+    a[N - k + 2] <- Conj(a[k])
+  }
+  
+  # Inverse FFT
+  Z <- Re(fft(a, inverse = TRUE)) / sqrt(N/2)
+  
+  cumsum(Z[1:n])
+}
+
+# Wrapper function to select method
+generate_fbm <- function(n, H, method = "cholesky") {
+  method <- tolower(method)
+  
+  switch(method,
+    "hosking" = generate_fbm_hosking(n, H),
+    "cholesky" = generate_fbm_cholesky(n, H),
+    "fft" = generate_fbm_fft(n, H),
+    "crw" = generate_fbm_crw(n, H),
+    "rmd" = generate_fbm_rmd(n, H),
+    "spectral" = generate_fbm_spectral(n, H),
+    generate_fbm_cholesky(n, H)  # Default to Cholesky
+  )
+}
+
+# Helper to compute frame indices used by both animations
+calc_frame_indices <- function(n_steps) {
+  frame_skip <- max(1, floor(n_steps / 100))
+  sort(unique(c(seq(1, n_steps, by = frame_skip), n_steps)))
+}
+
+# Function to create animation frames
+create_animation_frames <- function(path, H, n_steps, method = "cholesky", frame_indices = NULL) {
+  frames <- list()
+  
+  if (is.null(frame_indices)) {
+    frame_indices <- calc_frame_indices(n_steps)
+  } else {
+    frame_indices <- sort(unique(frame_indices))
+  }
+  
+  for (step in frame_indices) {
+    temp_file <- tempfile(fileext = ".png")
+    
+    png(temp_file, width = 700, height = 500, res = 100)
+    
+    plot(
+      1:n_steps,
+      path,
+      type = "n",
+      lwd = 2.5,
+      col = "#2E86AB",
+      xlab = "Time",
+      ylab = "Position",
+      main = paste0("fBM Simulation: H = ", round(H, 2), 
+                    " | ", method, " | Step: ", step, "/", n_steps),
+      cex.main = 1.5,
+      cex.lab = 1.2
+    )
+    
+    grid(nx = 20, ny = 20, col = "lightgray", lty = 2)
+    
+    if (step > 0) {
+      lines(1:step, path[1:step], lwd = 2.5, col = "#2E86AB")
+      points(step, path[step], col = "#E74C3C", cex = 1.5, pch = 16)
+    }
+    
+    if (H > 0.55) {
+      interpretation <- "Persistent (Trending)"
+      text_col <- "#A23B72"
+    } else if (H < 0.45) {
+      interpretation <- "Mean-Reverting"
+      text_col <- "#F18F01"
+    } else {
+      interpretation <- "Standard BM"
+      text_col <- "#C73E1D"
+    }
+    
+    mtext(interpretation, side = 3, line = -1.5, col = text_col, font = 2, cex = 1.2)
+    
+    dev.off()
+    frames[[length(frames) + 1]] <- image_read(temp_file)
+    unlink(temp_file)
+  }
+  
+  animation <- do.call(c, frames)
+  animation <- image_animate(animation, fps = 10, loop = 1)
+  
+  return(animation)
+}
+
+estimate_zero_crossings <- function(path) {
+  dx <- diff(path)
+  if (length(dx) < 2) return(NA_real_)
+
+  dx <- dx - mean(dx)
+
+  signed <- sign(dx)
+  signed[signed == 0] <- NA
+
+  crossings <- sum(signed[-1] * signed[-length(signed)] < 0, na.rm = TRUE)
+  denom <- max(1, length(dx) - 1)
+
+  p_star <- crossings / denom
+  p_star <- pmin(pmax(p_star, 1e-6), 1 - 1e-6)
+
+  1 + log2(cos(pi * p_star / 2))
+}
+
+estimate_quadratic_variation <- function(path, max_lag = 10) {
+  n <- length(path)
+  if (n < 5) return(NA_real_)
+  max_h <- min(max_lag, floor((n - 1) / 2))
+  if (max_h < 2) return(NA_real_)
+  h_vals <- seq_len(max_h)
+  V <- sapply(h_vals, function(h) {
+    diffs <- path[(h + 1):n] - path[1:(n - h)]
+    mean(diffs^2)
+  })
+  positive_v <- V > 0
+  if (!any(positive_v)) return(NA_real_)
+  fit <- lm(log(V[positive_v]) ~ log(h_vals[positive_v]))
+  slope <- coef(fit)[2]
+  as.numeric(slope / 2)
+}
+
+estimate_rs <- function(path) {
+  n <- length(path)
+  if (n < 2) return(NA_real_)
+  mean_val <- mean(path)
+  Y <- cumsum(path - mean_val)
+  R <- max(Y) - min(Y)
+  S <- sd(path)
+  if (S <= 0 || R <= 0) return(NA_real_)
+  log(R / S) / log(n)
+}
+
+estimate_whittle <- function(path,
+                             H_grid = seq(0.1, 0.9, by = 0.02),
+                             m_frac = 0.1) {
+  dx <- diff(path)
+  N <- length(dx)
+  if (N < 64) return(NA_real_)
+
+  dx <- dx - mean(dx)
+
+  fft_vals <- fft(dx)
+  periodogram <- (Mod(fft_vals)^2) / N
+
+  max_j <- floor(N / 2)
+  m_raw <- floor(N^0.6)
+  m <- max(5, floor(m_frac * max_j), m_raw)
+  m <- min(m, max_j)
+  if (m < 5) return(NA_real_)
+
+  j <- seq_len(m)
+  lambda <- 2 * pi * j / N
+  I_vals <- Re(periodogram[j + 1])
+
+  scores <- sapply(H_grid, function(H) {
+    shape <- lambda^(-(2 * H - 1))
+    shape <- pmax(shape, 1e-8)
+
+    sigma2_hat <- mean(I_vals / shape)
+    sigma2_hat <- max(sigma2_hat, 1e-8)
+
+    f_hat <- sigma2_hat * shape
+    sum(log(f_hat) + I_vals / f_hat)
+  })
+
+  H_grid[which.min(scores)]
+}
+
+compute_segment_posteriors <- function(path, L, a = 0.5) {
+  dx <- diff(path)
+  n <- length(dx)
+  if (n < L * 2) return(NULL)
+
+  N_seg <- floor(n / L)
+  if (N_seg < 2) return(NULL)
+
+  dx <- dx[1:(L * N_seg)]
+  segments <- split(dx, rep(seq_len(L), each = N_seg))
+
+  lapply(segments, function(seg) {
+    s <- sign(seg)
+    s[s == 0] <- NA
+    crossings <- sum(s[-1] * s[-length(s)] < 0, na.rm = TRUE)
+    N_pairs <- max(1, length(seg) - 1)
+
+    list(
+      alpha = crossings + 1 - a,
+      beta = (N_pairs - crossings) + 1 - a,
+      N_pairs = N_pairs
+    )
+  })
+}
+
+segment_H_summary <- function(alpha, beta, n_draws = 2000, alpha_ci = 0.05) {
+  p_draws <- rbeta(n_draws, alpha, beta)
+  p_draws <- pmin(pmax(p_draws, 1e-6), 1 - 1e-6)
+  H_draws <- 1 + log2(cos(pi * p_draws / 2))
+
+  H_mean <- mean(H_draws)
+  H_low <- quantile(H_draws, probs = alpha_ci / 2)
+  H_high <- quantile(H_draws, probs = 1 - alpha_ci / 2)
+
+  c(H_mean = H_mean, H_low = H_low, H_high = H_high)
+}
+
+compute_segment_H_trajectory <- function(path, L, a = 0.5, n_draws = 2000, alpha_ci = 0.05) {
+  dx <- diff(path)
+  n <- length(dx)
+  if (n < L * 2) return(NULL)
+
+  N_seg <- floor(n / L)
+  if (N_seg < 2) return(NULL)
+
+  idx <- seq_len(L * N_seg)
+  dx <- dx[idx]
+  segments <- split(dx, rep(seq_len(L), each = N_seg))
+
+  res <- data.frame(
+    segment = integer(L),
+    mid_idx = numeric(L),
+    H_mean = numeric(L),
+    H_low = numeric(L),
+    H_high = numeric(L)
+  )
+
+  for (k in seq_len(L)) {
+    seg <- segments[[k]]
+    s <- sign(seg)
+    s[s == 0] <- NA
+    crossings <- sum(s[-1] * s[-length(s)] < 0, na.rm = TRUE)
+    N_pairs <- max(1, length(seg) - 1)
+
+    alpha_post <- crossings + 1 - a
+    beta_post <- (N_pairs - crossings) + 1 - a
+
+    stats <- segment_H_summary(alpha_post, beta_post, n_draws = n_draws, alpha_ci = alpha_ci)
+
+    res$segment[k] <- k
+    res$mid_idx[k] <- 1 + (k - 0.5) * N_seg
+    res$H_mean[k] <- stats["H_mean"]
+    res$H_low[k] <- stats["H_low"]
+    res$H_high[k] <- stats["H_high"]
+  }
+
+  res
+}
+
+compute_f_L <- function(post_list, grid_p = seq(1e-4, 1 - 1e-4, length.out = 600)) {
+  if (length(post_list) == 0) return(NULL)
+  mat <- sapply(post_list, function(pars) {
+    dbeta(grid_p, pars$alpha, pars$beta)
+  })
+  f_L <- rowMeans(mat)
+  data.frame(p = grid_p, f = f_L)
+}
+
+is_unimodal <- function(f_vec) {
+  if (length(f_vec) < 3) return(TRUE)
+  d <- diff(f_vec)
+  signs <- sign(d)
+  signs[signs == 0] <- NA
+  signs <- stats::na.omit(signs)
+  if (length(signs) < 2) return(TRUE)
+
+  changes <- which(diff(signs) < 0)
+  length(changes) <= 1
+}
+
+select_optimal_L <- function(path, candidate_Ls = c(1, 2, 4, 8, 16), a = 0.5, grid_p = seq(1e-4, 1 - 1e-4, length.out = 600)) {
+  dx <- diff(path)
+  results <- list()
+
+  for (L in sort(unique(candidate_Ls))) {
+    post <- compute_segment_posteriors(path, L, a)
+    if (is.null(post)) next
+
+    fL_df <- compute_f_L(post, grid_p)
+    if (is.null(fL_df)) next
+
+    results[[as.character(L)]] <- list(
+      L = L,
+      post = post,
+      fL = fL_df,
+      unimodal = is_unimodal(fL_df$f)
+    )
+  }
+
+  if (length(results) == 0) return(NULL)
+
+  Ls <- as.numeric(names(results))
+  unimodal_flags <- sapply(results, function(entry) entry$unimodal)
+
+  if (all(unimodal_flags)) {
+    chosen <- results[["1"]]
+    if (is.null(chosen)) chosen <- results[[1]]
+  } else {
+    eligible <- names(results)[unimodal_flags & Ls > 1]
+    if (length(eligible) > 0) {
+      chosen <- results[[eligible[1]]]
+    } else {
+      chosen <- results[[1]]
+    }
+  }
+
+  chosen$L_star <- chosen$L
+  chosen
+}
+
+normalize_density <- function(fL_df) {
+  dp <- diff(fL_df$p)[1]
+  density <- pmax(fL_df$f, 0)
+  total <- sum(density * dp)
+  if (total <= 0) {
+    density <- rep(1 / length(density), length(density))
+    total <- sum(density * dp)
+  }
+  density / total
+}
+
+credible_p_interval <- function(fL_df, alpha = 0.05) {
+  density <- normalize_density(fL_df)
+  dp <- diff(fL_df$p)[1]
+  cdf_raw <- cumsum(density * dp)
+
+  keep <- !duplicated(cdf_raw)
+  cdf <- cdf_raw[keep]
+  p <- fL_df$p[keep]
+
+  p_min <- approx(cdf, p, xout = alpha / 2, rule = 2)$y
+  p_max <- approx(cdf, p, xout = 1 - alpha / 2, rule = 2)$y
+  c(p_min = p_min, p_max = p_max)
+}
+
+map_p_to_H_interval <- function(p_min, p_max) {
+  H_min <- 1 + log2(cos(pi * p_max / 2))
+  H_max <- 1 + log2(cos(pi * p_min / 2))
+  c(H_min = H_min, H_max = H_max)
+}
+
+EH_and_varH <- function(fL_df) {
+  density <- normalize_density(fL_df)
+  dp <- diff(fL_df$p)[1]
+  g <- 1 + log2(cos(pi * fL_df$p / 2))
+
+  EH <- sum(g * density * dp)
+  EH2 <- sum(g^2 * density * dp)
+  varH <- max(EH2 - EH^2, 0)
+  c(EH = EH, varH = varH)
+}
+
+compute_segmentation_summary <- function(path,
+                                         candidate_Ls = c(1, 2, 4, 8),
+                                         a = 0.5,
+                                         alpha_ci = 0.05,
+                                         grid_p = seq(1e-4, 1 - 1e-4, length.out = 600)) {
+  dx <- diff(path)
+  if (length(dx) < 4) return(NULL)
+
+  optimal <- select_optimal_L(path, candidate_Ls = candidate_Ls, a = a, grid_p = grid_p)
+  if (is.null(optimal)) return(NULL)
+
+  H_stats <- EH_and_varH(optimal$fL)
+  credible <- credible_p_interval(optimal$fL, alpha = alpha_ci)
+  H_interval <- map_p_to_H_interval(credible["p_min"], credible["p_max"])
+
+  segments <- compute_segment_H_trajectory(path, optimal$L_star, a = a, n_draws = 1200, alpha_ci = alpha_ci)
+
+  list(
+    L_star = optimal$L_star,
+    fL = optimal$fL,
+    global = c(
+      H_mean = H_stats["EH"],
+      H_low = H_interval["H_min"],
+      H_high = H_interval["H_max"]
+    ),
+    segments = segments
+  )
+}
+
+compute_estimator_trajectory <- function(path, steps) {
+  steps <- sort(unique(steps))
+  df <- data.frame(
+    step = steps,
+    zero = NA_real_,
+    quad = NA_real_,
+    rs = NA_real_,
+    whittle = NA_real_
+  )
+  for (i in seq_along(steps)) {
+    sample_path <- path[1:steps[i]]
+    df$zero[i] <- estimate_zero_crossings(sample_path)
+    df$quad[i] <- estimate_quadratic_variation(sample_path)
+    df$rs[i] <- estimate_rs(sample_path)
+    df$whittle[i] <- estimate_whittle(sample_path)
+  }
+  df
+}
+
+# --------------------------------------------------------------------
+# Improved create_estimator_animation: Bayesian line and CI always visible
+# --------------------------------------------------------------------
+create_estimator_animation <- function(est_df,
+                                       H_true,
+                                       path,
+                                       frame_indices,
+                                       n_steps = max(est_df$step),
+                                       candidate_Ls = c(1, 2, 4, 8)) {
+  frames <- list()
+
+  # ----- colours / labels -----
+  method_colors <- c(
+    zero    = "#1f78b4",
+    quad    = "#33a02c",
+    rs      = "#e31a1c",
+    whittle = "#ff7f00",
+    bayes   = "#6a3d9a"
+  )
+  method_labels <- c(
+    zero    = "Zero-crossings",
+    quad    = "Quadratic variation",
+    rs      = "Rescaled Range (R/S)",
+    whittle = "Whittle",
+    bayes   = "Bayesian segmentation"
+  )
+  data_methods <- c("zero", "quad", "rs", "whittle")
+
+  steps <- est_df$step
+  n_frames <- length(steps)
+
+  # -------------------------------------------------
+  # 1) PRECOMPUTE BAYESIAN GLOBAL ESTIMATES PER STEP
+  # -------------------------------------------------
+  bayes_mean <- rep(NA_real_, n_frames)
+  bayes_low  <- rep(NA_real_, n_frames)
+  bayes_high <- rep(NA_real_, n_frames)
+
+  for (i in seq_len(n_frames)) {
+    step <- steps[i]
+    # don't even try with very short paths
+    if (step < 50) next
+
+    seg_summary <- compute_segmentation_summary(
+      path[1:step],
+      candidate_Ls = candidate_Ls
+    )
+
+    if (!is.null(seg_summary) && !is.null(seg_summary$global)) {
+      bayes_mean[i] <- seg_summary$global["H_mean"]
+      bayes_low[i]  <- seg_summary$global["H_low"]
+      bayes_high[i] <- seg_summary$global["H_high"]
+    }
+  }
+
+  # -------------------------------------------------
+  # 2) COMPUTE Y-LIMITS INCLUDING BAYESIAN VALUES
+  # -------------------------------------------------
+  combined_vals <- c(
+    unlist(est_df[, data_methods], use.names = FALSE),
+    bayes_mean, bayes_low, bayes_high,
+    H_true
+  )
+  combined_vals <- combined_vals[is.finite(combined_vals)]
+
+  if (length(combined_vals) == 0) {
+    ylim <- c(0.1, 0.9)
+  } else {
+    y_min  <- min(combined_vals, na.rm = TRUE)
+    y_max  <- max(combined_vals, na.rm = TRUE)
+    margin <- max(0.05, 0.15 * (y_max - y_min))
+    ylim   <- c(max(-1, y_min - margin), min(1.5, y_max + margin))
+  }
+
+  # -------------------------------------------------
+  # 3) DRAW FRAMES USING PRECOMPUTED BAYES STATS
+  # -------------------------------------------------
+  for (i in seq_len(n_frames)) {
+    step    <- est_df$step[i]
+    current <- est_df[1:i, ]
+
+    temp_file <- tempfile(fileext = ".png")
+    png(temp_file, width = 700, height = 500, res = 100)
+
+    par(mar = c(4, 4, 3, 1))
+    plot(
+      current$step,
+      current$zero,
+      type = "n",
+      xlim = c(1, n_steps),
+      ylim = ylim,
+      xlab = "Sample size",
+      ylab = "Estimated H",
+      main = paste0("Estimators approaching H = ", round(H_true, 2)),
+      sub  = paste0("Step: ", step, " / ", n_steps),
+      cex.main = 1.4,
+      cex.lab  = 1.2
+    )
+
+    grid(nx = 10, ny = 10, col = "lightgray", lty = 3)
+    abline(h = H_true, col = "#4d4d4d", lty = 2, lwd = 1.5)
+
+    # --- frequentist estimators ---
+    for (method in data_methods) {
+      values <- current[[method]]
+      valid  <- !is.na(values)
+      if (any(valid)) {
+        lines(
+          current$step[valid],
+          values[valid],
+          col = method_colors[[method]],
+          lwd = 2
+        )
+        last_idx <- tail(which(valid), 1)
+        points(
+          current$step[last_idx],
+          values[last_idx],
+          col = method_colors[[method]],
+          pch = 16,
+          cex = 1.2
+        )
+      }
+    }
+
+    # --- Bayesian global line + CI ---
+    valid_bayes <- !is.na(bayes_mean[1:i])
+    if (any(valid_bayes)) {
+      # line
+      lines(
+        steps[valid_bayes],
+        bayes_mean[valid_bayes],
+        col = method_colors[["bayes"]],
+        lwd = 2,
+        lty = 2
+      )
+
+      # last point + error bar
+      last_idx <- tail(which(valid_bayes), 1)
+      points(
+        steps[last_idx],
+        bayes_mean[last_idx],
+        col = method_colors[["bayes"]],
+        pch = 17,
+        cex = 1.2
+      )
+      if (!is.na(bayes_low[last_idx]) && !is.na(bayes_high[last_idx])) {
+        arrows(
+          x0 = steps[last_idx],
+          y0 = bayes_low[last_idx],
+          x1 = steps[last_idx],
+          y1 = bayes_high[last_idx],
+          code = 3,
+          angle = 90,
+          length = 0.05,
+          col = method_colors[["bayes"]],
+          lwd = 1.1
+        )
+      }
+    }
+
+    # legend and text labels
+    legend(
+      "topright",
+      legend = method_labels,
+      col    = method_colors,
+      lwd    = 2,
+      lty    = c(1, 1, 1, 1, 2),
+      pch    = c(16, 16, 16, 16, 17),
+      bty    = "n",
+      cex    = 0.8
+    )
+
+    usr      <- par("usr")
+    label_y  <- usr[4] - 0.05 * diff(usr[3:4])
+    y_step   <- 0.05 * diff(usr[3:4])
+    label_x  <- usr[1] + 0.02 * diff(usr[1:2])
+    idx_lab  <- 0
+    for (method in data_methods) {
+      last_val <- tail(na.omit(current[[method]]), 1)
+      if (length(last_val) == 0) next
+      text(
+        x = label_x,
+        y = label_y - idx_lab * y_step,
+        labels = paste0(
+          method_labels[[method]], ": ",
+          formatC(last_val, digits = 2, format = "f")
+        ),
+        col = method_colors[[method]],
+        adj = c(0, 1),
+        cex = 0.85
+      )
+      idx_lab <- idx_lab + 1
+    }
+
+    dev.off()
+    frames[[length(frames) + 1]] <- image_read(temp_file)
+    unlink(temp_file)
+  }
+
+  animation <- do.call(c, frames)
+  image_animate(animation, fps = 10, loop = 1)
+}
+```
+```{r}
+#| context: server
+
+anim_state <- reactiveValues(
+  animation = NULL,
+  H = 0.5,
+  n_steps = 500,
+  method = "cholesky"
+)
+est_state <- reactiveValues(
+  animation = NULL
+)
+
+observeEvent(input$resample, {
+  H <- input$hurst
+  n <- input$n_steps
+  method <- input$method
+  
+  frame_indices <- calc_frame_indices(n)
+
+  path <- generate_fbm(n, H, method)
+  anim_state$animation <- create_animation_frames(path, H, n, method, frame_indices)
+  anim_state$H <- H
+  anim_state$n_steps <- n
+  anim_state$method <- method
+
+  est_state$animation <- NULL
+  estimator_df <- compute_estimator_trajectory(path, frame_indices)
+  est_state$animation <- create_estimator_animation(
+    estimator_df,
+    H,
+    path,
+    frame_indices,
+    n_steps = n
+  )
+})
+
+output$simulation_plot <- renderImage({
+  if (is.null(anim_state$animation)) {
+    temp_file <- tempfile(fileext = ".png")
+    png(temp_file, width = 700, height = 500)
+    plot(0, type = "n", axes = FALSE, xlab = "", ylab = "")
+    text(0.5, 0.5, "wait", 
+         cex = 1.5, col = "gray60")
+    dev.off()
+    
+    list(src = temp_file, contentType = "image/png", width = "100%", height = "450px")
+  } else {
+    temp_file <- tempfile(fileext = ".gif")
+    image_write(anim_state$animation, path = temp_file)
+    
+    list(src = temp_file, contentType = "image/gif", width = "100%", height = "450px", deleteFile = TRUE)
+  }
+}, deleteFile = FALSE)
+
+output$estimator_plot <- renderImage({
+  if (is.null(est_state$animation)) {
+    temp_file <- tempfile(fileext = ".png")
+    png(temp_file, width = 700, height = 500)
+    plot(0, type = "n", axes = FALSE, xlab = "", ylab = "")
+    text(0.5, 0.5, "wait", 
+         cex = 1.3, col = "gray50")
+    dev.off()
+    
+    list(src = temp_file, contentType = "image/png", width = "100%", height = "450px")
+  } else {
+    temp_file <- tempfile(fileext = ".gif")
+    image_write(est_state$animation, path = temp_file)
+    
+    list(src = temp_file, contentType = "image/gif", width = "100%", height = "450px", deleteFile = TRUE)
+  }
+}, deleteFile = FALSE)
+```
+::: {style="display: flex; gap: 20px; align-items: flex-start;"}
+
+::: {style="flex: 0 0 25%; background-color: #f0f0f0; padding: 15px; border-radius: 5px;"}
+
+```{r}
+# Add CSS styling for compact controls
+tags$style(HTML("
+  .compact-controls .form-group {
+    margin-bottom: 12px;
+  }
+  .compact-controls .form-group label {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .compact-controls select {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  .compact-controls input[type='slider'] {
+    font-size: 12px;
+  }
+  .compact-controls .shiny-input-container {
+    font-size: 12px;
+  }
+"))
+
+tags$div(class = "compact-controls",
+  selectInput(
+    "method",
+    strong("Simulation Method:"),
+    choices = list(
+      "Cholesky (Exact, O(N³))" = "cholesky",
+      "Hosking (Exact, O(N²))" = "hosking",
+      "FFT (Near-exact, O(N log N))" = "fft",
+      "Spectral (Approx, O(N log N))" = "spectral",
+      "Corr. Random Walk (Approx, fast)" = "crw",
+      "Random Midpoint Displacement (Exact*)" = "rmd"
+    ),
+    selected = "cholesky"
+  ),
+  
+sliderInput(
+  "hurst",
+  strong("Hurst Exponent (H):"),
+  min = 0.1,
+  max = 0.9,
+  value = 0.5,
+  step = 0.05
+  ),
+
+numericInput(
+  "n_steps",
+  strong("Time Steps:"),
+  value = 500,
+  min = 100,
+  max = 2000,
+  step = 100
+  ),
+
+actionButton("resample", "Generate Sample", class = "btn-primary btn-block", width = "100%")
+)
+```
+
+:::
+
+::: {style="flex: 1; min-width: 0;"}
+
+```{r}
+plotOutput("simulation_plot", height = "320px")
+```
+
+
+```{r}
+imageOutput("estimator_plot", height = "320px")
+```
+</div>
+
+:::
+
+:::
+
+---
+
+
+
+
+
+# Signal Segmentation
+
+To capture local variations, partition the original signal into $L$ disjoint segments of length $N+1$. Let $Z_k$ be the number of zero-crossings in segment $k$.
+
+---
+
+## Aggregate Posterior for Zero-Crossing Probability
+
+The aggregate density:
+$$
+f_L(p) =
+\frac{1}{L} \sum_{k=1}^{L}
+\frac{
+p^{Z_k - a} (1-p)^{N - Z_k - a}
+}{
+B(Z_k+1-a,\ N-Z_k+1-a)
+}
+$$
+
+From $f_L(p)$ one can derive the implied distribution of $H$.
+
+---
+
+## Mean and Variance of Hurst Exponent
+
+Define
+$$
+E(H) = 1 + \int_0^1 f_L(p)\, \log_2\left( \cos \frac{\pi p}{2} \right ) dp
+$$
+
+$$
+\sigma^2(H) =
+\int_0^1
+\left[ 1 + \log_2\left( \cos \frac{\pi p}{2} \right ) \right]^2 f_L(p)\,dp
+- [E(H)]^2
+$$
+
+These integrals are evaluated numerically.
+
+---
+
+# Optimal Segmentation
+
+## Axioms for Choosing $L^*$
+
+Axiom 1: The aggregate density $f_L(p)$ is unimodal.  
+Axiom 2: Among all segmentations where $f_L(p)$ is unimodal, choose the smallest $L > 1$ (or, equivalently, choose $L$ minimizing the variance of $H$).
+
+Define the optimal number of segments $L^*$ as
+$$
+L^* =
+\begin{cases}
+1, & \text{if $f_L(p)$ is unimodal for all admissible $L$}\\
+\min_{L>1} \left\{L : f_L(p)\ \text{is unimodal}\right\}, & \text{otherwise}
+\end{cases}
+$$
+
+---
+
+## Credible Intervals for $H$
+
+Given $f_{L^*}(p)$ and a credibility level $1-\alpha$, compute $p_{\min},\ p_{\max}$ as
+$$
+\int_0^{p_{\min}} f_{L^*}(p)\,dp = \frac{\alpha}{2}, \qquad
+\int_0^{p_{\max}} f_{L^*}(p)\,dp = 1 - \frac{\alpha}{2}
+$$
+
+Resulting credible interval:
+$$
+H_{\min} = 1 + \log_2\left( \cos\frac{\pi p_{\max}}{2} \right ), \qquad
+H_{\max} = 1 + \log_2\left( \cos\frac{\pi p_{\min}}{2} \right )
+$$
+
+Compare to frequentist binomial-based confidence intervals if desired.
+
+---
+
+# Frequentist Zero-Crossing Interval (Comparison)
+
+For comparison, under the binomial model with known $p^*$, one can define confidence bounds using integers $A$ and $B$ satisfying
+$$
+\sum_{k=0}^A \Pr(Z=k) \le \frac{\alpha}{2}, \qquad
+\sum_{k=B}^N \Pr(Z=k) \le \frac{\alpha}{2}
+$$
+
+where
+$$
+\Pr(Z=k) = \binom{N}{k} (p^*)^k (1-p^*)^{N-k}
+$$
+
+Transform $A, B$ to bounds on $H$:
+$$
+H^{\text{ZC}}_{\min} = 1 + \log_2\left( \cos\frac{\pi B}{2N} \right )
+$$
+$$
+H^{\text{ZC}}_{\max} = 1 + \log_2\left( \cos\frac{\pi A}{2N} \right )
+$$
+
+
+---
+
+# Case Study: EEG Application
+
+## Data Description
+
+146 control normal (CN), 28 with Alzheimer disease (AD).  
+Recording protocol: 200 Hz sampling frequency.  
+Electrode montage (10–20 system; see electrode scheme in related literature).  
+Quasi-stationarity: 2-second windows ($400$ samples).
+
+---
+
+## Estimation Procedure
+
+1. Divide each EEG recording into non-overlapping 2-second windows.
+2. For each window and channel, compute zero-crossings $Z_k$.
+3. Construct segment-level posteriors for $p^*$ and aggregate $f_L(p)$.
+4. Determine optimal $L^*$ and compute $E(H)$ and credible intervals for each segment.
+5. For each recording/channel, study time-variability of $E(H)$ across segments (cf. plots showing time variability for AD vs CN).
+
+---
+
+## Variability Measures and Statistical Testing
+
+Calculate, across segments, variability measures:  
+Range $R$  
+Interquartile range (IQR)  
+Standard deviation $s$  
+Median absolute deviation (MAD)  
+Absolute average deviation (AAD)  
+
+Apply the Wilcoxon–Mann–Whitney test to compare AD vs CN for each channel and measure. Use FDR (false discovery rate) for multiple testing.
+
+The range of $H$ is the most discriminative measure (lowest p-values across channels).  
+After FDR correction at appropriate $\alpha_{\text{FDR}}$, significant differences were mainly in frontal and frontotemporal channels (e.g., 3, 13, 17–19).
+
+---
+
+Include:  
+- Time-variability plots of $E(H)$ for representative subjects (AD, CN).  
+- Distribution of $R$ for selected channels.  
+- Summary tables of p-values for different variability measures and methods (Bayesian ZC, traditional ZC, R/S).
+
+---
+
+# Discussion
+
+Greater variability of $H$ in AD reflects disrupted EEG synchrony and altered neuronal coordination.  
+Relationship with neurohistological changes in frontotemporal regions and prior findings on EEG complexity/fractal dimension in AD.
+
+**Advantages of Bayesian ZC:**  
+- Interval/credible bands, not just point estimates.  
+- Incorporates segmentation/local nonstationarity.  
+- Improved group difference sensitivity vs. classical ZC and R/S.
+
+**Limitations:**  
+- Assumes fGn-like behavior.  
+- Choice of prior parameter $a$.  
+- Computation of $p$ integrals and $L^*$ optimization.
+
+---
+
+# Conclusion
+
+Presented Bayesian zero-crossing method for Hurst exponent: expected value, variance, and credible intervals.  
+Defined and demonstrated optimal segmentation for quasi-stationary signals.  
+Applied to EEG: variability of $H$ distinguishes AD from CN, especially in frontotemporal channels.  
+Possible extensions to other fractal processes and biomedical time series.
+
+---
