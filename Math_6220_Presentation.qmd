@@ -1,25 +1,591 @@
 ---
-title: "Math_6220_Presentation"
-format: beamer
+title: "Heavy-Tailed Gradient Noise and Levy-Driven SGD"
+subtitle: "A tail-index analysis of stochastic gradient noise in deep neural networks"
+author: "Math 6220 Final Presentation"
+date: "April 2026"
+format:
+  beamer:
+    aspectratio: 169
+    theme: Madrid
+    colortheme: default
+    fonttheme: professionalfonts
+    navigation-symbols: false
+header-includes:
+  - \usepackage{amsmath, amssymb, bm}
+  - \usepackage{mathtools}
 ---
 
-## Quarto
+## Handoff From the Previous Talks
 
-Quarto enables you to weave together content and executable code into a finished presentation. To learn more about Quarto presentations see <https://quarto.org/docs/presentations/>.
+The previous talks gave us two models:
 
-## Bullets
+- Brownian motion: continuous paths, Gaussian increments, finite variance.
+- SDE model for SGD: minibatch noise perturbs gradient flow.
 
-When you click the **Render** button a document will be generated that includes:
+This paper asks:
 
--   Content authored with markdown
--   Output from executable code
+> What if the stochastic gradient noise is not close to Gaussian?
 
-## Code
+The answer proposed by Simsekli, Sagun, and Gurbuzbalaban is:
 
-When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+- model gradient noise with an $\alpha$-stable law;
+- model continuous-time SGD with a Levy-driven SDE;
+- use jump-process metastability to explain a preference for wide minima.
 
-```{r}
-1 + 1
-```
+## The SGD Object Being Modeled
 
+We minimize an empirical risk
 
+$$
+f(w) = \frac{1}{n}\sum_{i=1}^n f^{(i)}(w),
+\qquad
+w^\star = \arg\min_{w \in \mathbb{R}^p} f(w).
+$$
+
+SGD uses a minibatch $\Omega_k$ of size $b$:
+
+$$
+w_{k+1}
+= w_k - \eta \nabla \widetilde f_k(w_k),
+\qquad
+\nabla \widetilde f_k(w)
+= \frac{1}{b}\sum_{i \in \Omega_k}\nabla f^{(i)}(w).
+$$
+
+Define stochastic gradient noise
+
+$$
+U_k(w) = \nabla \widetilde f_k(w) - \nabla f(w).
+$$
+
+Everything in the paper depends on how we model $U_k(w)$.
+
+## Brownian Baseline
+
+The standard modeling assumption is
+
+$$
+U_k(w) \sim \mathcal{N}(0,\sigma^2 I).
+$$
+
+Then the SGD update can be written as
+
+$$
+w_{k+1}
+= w_k - \eta \nabla f(w_k)
++ \sqrt{\eta}\sqrt{\eta\sigma^2}\, Z_k,
+\qquad
+Z_k \sim \mathcal{N}(0,I).
+$$
+
+For small $\eta$, this suggests the SDE
+
+$$
+dw_t = -\nabla f(w_t)\,dt + \sqrt{\eta\sigma^2}\,dB_t.
+$$
+
+This is Langevin-type dynamics driven by Brownian motion.
+
+## Why the Paper Challenges This Baseline
+
+The Gaussian/Brownian picture has two tensions.
+
+1. Empirical tension: measured gradient noise in deep nets has much heavier tails than Gaussian noise.
+
+2. Theoretical tension: Brownian paths are continuous, so escaping a basin usually means climbing the barrier.
+
+For Brownian-driven small-noise dynamics, first exit times scale roughly like
+
+$$
+\exp\!\left(\frac{2H}{\varepsilon^2}\right),
+$$
+
+where $H$ is a relevant barrier height.
+
+That makes depth more important than width, which clashes with the folklore that SGD tends to prefer wide minima.
+
+## Figure Placeholder: Gradient Noise Is Not Gaussian
+
+**Paper Figure 1 placeholder**
+
+Insert the three-panel histogram comparison:
+
+- real gradient-noise norm from AlexNet on CIFAR10;
+- scaled Gaussian norm;
+- scaled $\alpha$-stable norm.
+
+Main message:
+
+> The real histogram visually resembles the heavy-tailed stable sample more than the Gaussian one.
+
+Suggested presentation use: spend about 45 seconds here, because this figure motivates the whole change of model.
+
+## Stable Laws: The Replacement for Gaussian Noise
+
+The generalized central limit theorem says:
+
+- finite variance sums $\Rightarrow$ Gaussian limit;
+- heavy-tailed sums with infinite variance $\Rightarrow$ $\alpha$-stable limit.
+
+The paper focuses on symmetric $\alpha$-stable random variables:
+
+$$
+X \sim S\alpha S(\sigma)
+\quad \Longleftrightarrow \quad
+\mathbb{E}e^{i\omega X}
+= \exp(-|\sigma\omega|^\alpha).
+$$
+
+Key facts:
+
+- $\alpha \in (0,2]$ is the tail index;
+- smaller $\alpha$ means heavier tails;
+- $\mathbb{E}|X|^r < \infty$ if and only if $r < \alpha$;
+- $\alpha=2$ recovers a Gaussian: $S2S(\sigma)=\mathcal{N}(0,2\sigma^2)$.
+
+## Proof Sketch: Why Stable Laws Replace Gaussians
+
+The intuitive proof is the same story as the CLT, but with different scaling.
+
+For Gaussian CLT:
+
+$$
+\frac{X_1+\cdots+X_m}{m^{1/2}}
+\Rightarrow \text{Gaussian}.
+$$
+
+For heavy-tailed variables with tail index $\alpha$:
+
+$$
+\frac{X_1+\cdots+X_m}{m^{1/\alpha}}
+\Rightarrow S\alpha S.
+$$
+
+The scaling exponent changes from $1/2$ to $1/\alpha$ because rare large terms dominate the sum.
+
+That is the mathematical door from Brownian motion to Levy motion.
+
+## From Stable Noise to a Levy-Driven SDE
+
+The paper assumes each coordinate of the gradient noise is stable:
+
+$$
+[U_k(w)]_i \sim S\alpha S(\sigma(w)).
+$$
+
+Then SGD can be rewritten as
+
+$$
+w_{k+1}
+= w_k - \eta \nabla f(w_k)
++ \eta^{1/\alpha}\left(\eta^{(\alpha-1)/\alpha}\sigma\right)S_k,
+$$
+
+where each coordinate of $S_k$ has law $S\alpha S(1)$.
+
+For small $\eta$, the continuous-time model becomes
+
+$$
+dw_t
+= -\nabla f(w_t)\,dt
++ \eta^{(\alpha-1)/\alpha}\sigma\,dL_t^\alpha.
+$$
+
+Here $L_t^\alpha$ is an $\alpha$-stable Levy motion.
+
+## Brownian Motion vs. Levy Motion
+
+| Feature | Brownian motion $B_t$ | Stable Levy motion $L_t^\alpha$ |
+|---|---|---|
+| Increment law | Gaussian | $\alpha$-stable |
+| Tail behavior | light-tailed | heavy-tailed for $\alpha<2$ |
+| Variance | finite | infinite for $\alpha<2$ |
+| Paths | almost surely continuous | can have jumps |
+| Basin escape | climb out | jump out |
+| Special case | baseline | $\alpha=2$ gives scaled Brownian motion |
+
+The crucial behavioral change is not just "more noise."
+
+It is discontinuity: large jumps make barrier height less controlling.
+
+## Figure Placeholder: Stable Densities and Levy Paths
+
+**Paper Figure 2 placeholder**
+
+Insert the two-panel figure:
+
+- left: $S\alpha S$ densities for $\alpha=1.8$ and $\alpha=2$;
+- right: paths of $L_t^\alpha$ for $\alpha=1.8$ and $\alpha=2$.
+
+Main message:
+
+> As soon as $\alpha<2$, the tails get heavier and paths can jump.
+
+Suggested explanation: Brownian motion "wiggles"; Levy motion sometimes "teleports."
+
+## Metastability Setup
+
+To isolate the basin-escape mechanism, the paper studies the 1D small-noise SDE
+
+$$
+dw_t^\varepsilon
+= -\nabla f(w_t^\varepsilon)\,dt
++ \varepsilon\,dL_t^\alpha.
+$$
+
+Assume $f$ has local minima
+
+$$
+m_1,\dots,m_r
+$$
+
+separated by local maxima
+
+$$
+-\infty=s_0<m_1<s_1<\cdots<s_{r-1}<m_r<s_r=\infty.
+$$
+
+Each valley is
+
+$$
+S_i = (s_{i-1},s_i),
+\qquad
+L_i = |s_i-s_{i-1}|.
+$$
+
+Question: starting near $m_i$, how long until the process reaches another basin?
+
+## Theorem 1: Levy Exit Times
+
+For $w_0$ near $m_i$, as $\varepsilon \to 0$, transition times satisfy
+
+$$
+\mathbb{P}_{w_0}(\varepsilon^\alpha T^i(\varepsilon)\ge u)
+\le e^{-q_i u}.
+$$
+
+The transition probabilities are controlled by
+
+$$
+q_{ij}
+= \frac{1}{\alpha}
+\left|
+\frac{1}{|s_{j-1}-m_i|^\alpha}
+- \frac{1}{|s_j-m_i|^\alpha}
+\right|,
+\qquad
+q_i=\sum_{j\ne i}q_{ij}.
+$$
+
+Interpretation:
+
+- transition time is polynomial in noise scale, on the order of $\varepsilon^{-\alpha}$;
+- the rates depend on distances to valley boundaries;
+- basin height does not appear.
+
+## Intuition for Theorem 1
+
+The full proof uses small-noise metastability theory for Levy processes, but the mechanism is understandable.
+
+For Brownian motion:
+
+- paths are continuous;
+- to leave a valley, the process must pass through the boundary;
+- the barrier height strongly controls the escape time.
+
+For Levy motion:
+
+- paths can make large jumps;
+- escape happens when one jump is large enough to clear the distance to the boundary;
+- the probability of such a jump is governed by the power-law tail.
+
+That is why width appears through distances, while height disappears from the leading-order formula.
+
+## Theorem 2: A Markov Chain Over Minima
+
+After rescaling time by $\varepsilon^{-\alpha}$, the Levy-driven process converges to a continuous-time Markov chain on the minima:
+
+$$
+w_{t\varepsilon^{-\alpha}}^\varepsilon
+\Rightarrow
+Y_{m_i}(t),
+\qquad
+Y(t)\in\{m_1,\dots,m_r\}.
+$$
+
+The generator has off-diagonal entries
+
+$$
+q_{ij}
+= \frac{1}{\alpha}
+\left|
+\frac{1}{|s_{j-1}-m_i|^\alpha}
+- \frac{1}{|s_j-m_i|^\alpha}
+\right|,
+$$
+
+and diagonal entries
+
+$$
+q_{ii}=-\sum_{j\ne i}q_{ij}.
+$$
+
+The stationary probabilities solve
+
+$$
+Q^T\pi=0.
+$$
+
+## Wide Valleys in the Two-Minima Case
+
+For two minima with $m_1<0<m_2$ and the barrier at $s_1=0$, the paper gives
+
+$$
+\pi_1
+= \frac{|m_1|^\alpha}{|m_1|^\alpha+m_2^\alpha},
+\qquad
+\pi_2
+= \frac{m_2^\alpha}{|m_1|^\alpha+m_2^\alpha}.
+$$
+
+So if $m_2>|m_1|$, the second valley is wider and
+
+$$
+\pi_2>\pi_1,
+\qquad
+\frac{\pi_2}{\pi_1}
+=\left(\frac{m_2}{|m_1|}\right)^\alpha.
+$$
+
+This is the cleanest theoretical connection:
+
+> If SGD noise is $\alpha$-stable, Levy metastability predicts more time in wider valleys.
+
+## Figure Placeholder: Two Valleys and Tail Estimator
+
+**Paper Figure 3 placeholder**
+
+Insert the two-panel figure:
+
+- left: objective with two local minima and a separating maximum;
+- right: validation of the tail-index estimator $\widehat{\alpha}$.
+
+Suggested use:
+
+- left panel goes with the stationary probability formula;
+- right panel transitions into the empirical methodology.
+
+## Estimating the Tail Index
+
+The paper uses an estimator specialized for stable laws.
+
+Let $X_1,\dots,X_K \sim S\alpha S(\sigma)$ and $K=K_1K_2$. Define block sums
+
+$$
+Y_i=\sum_{j=1}^{K_1}X_{j+(i-1)K_1},
+\qquad i=1,\dots,K_2.
+$$
+
+The estimator is
+
+$$
+\widehat{\frac{1}{\alpha}}
+=
+\frac{1}{\log K_1}
+\left(
+\frac{1}{K_2}\sum_{i=1}^{K_2}\log |Y_i|
+-
+\frac{1}{K}\sum_{i=1}^K \log |X_i|
+\right).
+$$
+
+Then $\widehat{1/\alpha}\to 1/\alpha$ almost surely as $K_2\to\infty$.
+
+## Proof Sketch: Why the Estimator Works
+
+Stable laws are stable under sums:
+
+$$
+X_1+\cdots+X_{K_1}
+\sim
+S\alpha S(K_1^{1/\alpha}\sigma).
+$$
+
+Taking logs of absolute values, the block sum looks like
+
+$$
+\log |Y_i|
+\approx
+\log |X_i| + \frac{1}{\alpha}\log K_1.
+$$
+
+So the average log-magnitude gap is approximately
+
+$$
+\frac{1}{\alpha}\log K_1.
+$$
+
+Divide by $\log K_1$, and you estimate $1/\alpha$.
+
+This proof idea is accessible because it uses the defining scaling property of stable laws.
+
+## Experimental Protocol
+
+At selected SGD iterations, the authors:
+
+1. compute the full gradient $\nabla f(w_k)$;
+2. partition the data into disjoint minibatches of size $b$;
+3. compute minibatch gradients $\nabla \widetilde f_{\Omega_k^i}(w_k)$;
+4. form gradient noises
+
+$$
+U_k^i(w_k)
+= \nabla \widetilde f_{\Omega_k^i}(w_k)-\nabla f(w_k);
+$$
+
+5. concatenate coordinates and estimate $\alpha$.
+
+Experiments vary:
+
+- architecture: fully connected nets and AlexNet-like CNNs;
+- dataset: MNIST, CIFAR10, CIFAR100;
+- network size, minibatch size, loss function, and random seed.
+
+## Results: Network Size
+
+**Paper Figures 4 and 5 placeholders**
+
+Insert:
+
+- Figure 4: $\widehat{\alpha}$ for FCNs as width and depth vary;
+- Figure 5: CNN accuracy and $\widehat{\alpha}$ as width varies.
+
+Main findings:
+
+- estimated $\alpha$ is far below $2$ in all shown configurations;
+- for MNIST FCNs, larger networks often produce smaller $\alpha$;
+- for CIFAR10 FCNs, $\alpha$ is roughly stable around $1.1$-$1.2$;
+- for CNNs, under-parametrized models have especially low $\alpha$, then stabilize near $1.0$-$1.1$.
+
+Takeaway:
+
+> Gradient noise is consistently heavy-tailed, and the tail index depends on architecture and data.
+
+## Results: Minibatch Size
+
+**Paper Figure 6 placeholder**
+
+Insert the minibatch-size plots for FCNs.
+
+The common intuition is:
+
+> Larger minibatches should make gradient noise more Gaussian.
+
+But the paper finds:
+
+- increasing minibatch size has little effect on $\widehat{\alpha}$;
+- even large minibatches remain far from $\alpha=2$;
+- training and test accuracies are comparable across these minibatch sizes.
+
+Interpretation:
+
+The usual CLT story may be missing the infinite-variance or heavy-tail structure of the summands.
+
+## Results: Evolution During Training
+
+**Paper Figure 7 placeholder**
+
+Insert the iteration-wise plots of:
+
+- estimated $\alpha$;
+- accuracy;
+- loss.
+
+Observed pattern:
+
+- early phase: $\alpha$ rapidly decreases;
+- near minimum $\alpha$: the SGD trajectory shows a jump-like event;
+- later phase: $\alpha$ stabilizes while accuracy improves.
+
+The authors interpret this as evidence that early SGD dynamics may include barrier crossing or large basin transitions.
+
+They do not prove whether the jump lands in a different basin or a better part of the same basin.
+
+## Brownian Results vs. Levy Results
+
+| Question | Brownian model | Levy model |
+|---|---|---|
+| Noise law | Gaussian | $\alpha$-stable |
+| CLT justification | finite variance CLT | generalized CLT |
+| Continuous-time driver | $B_t$ | $L_t^\alpha$ |
+| Path geometry | continuous | jumps for $\alpha<2$ |
+| Escape scaling | exponential in barrier height | polynomial in $\varepsilon^{-1}$ |
+| What controls preference? | depth/barrier height dominates | width appears directly |
+| Wide minima story | hard to explain locally | supported by metastability |
+
+The equivalence point:
+
+$$
+\alpha=2
+\quad \Rightarrow \quad
+L_t^\alpha = \sqrt{2}B_t.
+$$
+
+So Brownian motion is not discarded; it is the endpoint of a broader stable-family model.
+
+## What Is Proven vs. What Is Inferred
+
+Proven or cited mathematical facts:
+
+- stable laws arise from a generalized CLT;
+- stable Levy motion has $\alpha$-stable increments;
+- Levy-driven small-noise dynamics has width-dependent transition rates;
+- in simple cases, stationary probabilities favor wider valleys.
+
+Empirical evidence:
+
+- measured gradient noise in deep nets is heavy-tailed;
+- estimated $\alpha$ is consistently below $2$;
+- minibatch size does not restore Gaussianity in their experiments.
+
+Inference:
+
+> If SGD gradient noise is well modeled as $\alpha$-stable, then existing Levy metastability theory gives a plausible mechanism for SGD's preference for wide minima.
+
+## Limitations and Open Problems
+
+The paper is careful about what remains open.
+
+- The metastability theory is continuous-time; SGD is discrete.
+- The dependence on learning rate and minibatch size is not fully characterized.
+- The tail index may change with the current state $w_k$ and time.
+- Deep-network landscapes have many nearly flat directions, while the clean theory assumes nondegenerate minima.
+- Empirical heavy tails do not by themselves prove that an exact stable law governs every coordinate.
+
+These are not minor details, but they are also useful directions for future theory.
+
+## Closing Summary
+
+The paper's argument has a clear chain:
+
+$$
+\text{heavy-tailed gradient noise}
+\Rightarrow
+\alpha\text{-stable model}
+\Rightarrow
+\text{Levy-driven SDE}
+\Rightarrow
+\text{jumps}
+\Rightarrow
+\text{width-dependent metastability}.
+$$
+
+Compared with Brownian motion:
+
+- Brownian SGD noise explains diffusion around minima;
+- Levy SGD noise explains rare large jumps between regions;
+- the Levy model gives a cleaner local mechanism for why wide minima can be preferred.
+
+Final takeaway:
+
+> The tail index $\alpha$ is not just a distributional statistic; in this framework, it controls the geometry of SGD's exploration.
