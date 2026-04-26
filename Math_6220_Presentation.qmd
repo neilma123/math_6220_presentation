@@ -11,7 +11,9 @@ format:
     fonttheme: professionalfonts
     navigation-symbols: false
 header-includes:
-  - \usepackage{amsmath, amssymb, bm}
+  - \usepackage{amsmath}
+  - \usepackage{bm}
+  - \usepackage{amssymb}
   - \usepackage{mathtools}
 ---
 
@@ -104,21 +106,13 @@ where $H$ is a relevant barrier height.
 
 That makes depth more important than width, which clashes with the folklore that SGD tends to prefer wide minima.
 
-## Figure Placeholder: Gradient Noise Is Not Gaussian
+## Gradient Noise Is Not Gaussian
 
-**Paper Figure 1 placeholder**
+<div align="center">
 
-Insert the three-panel histogram comparison:
+![Comparison of Gradient Noise Norms](www/image1.png)
 
-- real gradient-noise norm from AlexNet on CIFAR10;
-- scaled Gaussian norm;
-- scaled $\alpha$-stable norm.
-
-Main message:
-
-> The real histogram visually resembles the heavy-tailed stable sample more than the Gaussian one.
-
-Suggested presentation use: spend about 45 seconds here, because this figure motivates the whole change of model.
+</div>
 
 ## Stable Laws: The Replacement for Gaussian Noise
 
@@ -202,58 +196,52 @@ Here $L_t^\alpha$ is an $\alpha$-stable Levy motion.
 | Variance | finite | infinite for $\alpha<2$ |
 | Paths | almost surely continuous | can have jumps |
 | Basin escape | climb out | jump out |
-| Special case | baseline | $\alpha=2$ gives scaled Brownian motion |
 
-The crucial behavioral change is not just "more noise."
 
-It is discontinuity: large jumps make barrier height less controlling.
+The crucial behavioral change is discontinuity: large jumps make barrier height less controlling. $\alpha=2$ gives scaled Brownian motion.
 
-## Figure Placeholder: Stable Densities and Levy Paths
+## Stable Densities and Levy Paths
 
-**Paper Figure 2 placeholder**
+<div align="center">
 
-Insert the two-panel figure:
+![S$\alpha$S Densities and Lévy Paths](www/image2.png)
 
-- left: $S\alpha S$ densities for $\alpha=1.8$ and $\alpha=2$;
-- right: paths of $L_t^\alpha$ for $\alpha=1.8$ and $\alpha=2$.
+</div>
 
-Main message:
+<div style="text-align: center;">
+<em>Figure 2: Left - $\mathrm{S}\alpha\mathrm{S}$ densities; right - sample paths of $L_t^{\alpha}$ for $p=1$. For $\alpha < 2$, the density has heavier tails and $L_t^{\alpha}$ displays jumps.</em>
+</div>
 
-> As soon as $\alpha<2$, the tails get heavier and paths can jump.
-
-Suggested explanation: Brownian motion "wiggles"; Levy motion sometimes "teleports."
 
 ## Metastability Setup
 
-To isolate the basin-escape mechanism, the paper studies the 1D small-noise SDE
+To isolate the basin-escape mechanism, the paper studies the 1D small-noise SDE:
 
+\small
 $$
 dw_t^\varepsilon
 = -\nabla f(w_t^\varepsilon)\,dt
 + \varepsilon\,dL_t^\alpha.
 $$
+\normalsize
 
-Assume $f$ has local minima
+Assume $f$ has local minima $m_1,\dots,m_r$ separated by local maxima
 
-$$
-m_1,\dots,m_r
-$$
-
-separated by local maxima
-
+\small
 $$
 -\infty=s_0<m_1<s_1<\cdots<s_{r-1}<m_r<s_r=\infty.
 $$
+\normalsize
 
-Each valley is
+Each valley:
 
+\small
 $$
-S_i = (s_{i-1},s_i),
-\qquad
-L_i = |s_i-s_{i-1}|.
+S_i = (s_{i-1},s_i), \qquad L_i = |s_i-s_{i-1}|.
 $$
+\normalsize
 
-Question: starting near $m_i$, how long until the process reaches another basin?
+\textbf{Question:} Starting near $m_i$, how long until the process reaches another basin?
 
 ## Theorem 1: Levy Exit Times
 
@@ -305,16 +293,16 @@ That is why width appears through distances, while height disappears from the le
 
 After rescaling time by $\varepsilon^{-\alpha}$, the Levy-driven process converges to a continuous-time Markov chain on the minima:
 
+\small
 $$
 w_{t\varepsilon^{-\alpha}}^\varepsilon
 \Rightarrow
-Y_{m_i}(t),
-\qquad
-Y(t)\in\{m_1,\dots,m_r\}.
+Y_{m_i}(t), \qquad Y(t)\in\{m_1,\dots,m_r\}.
 $$
 
 The generator has off-diagonal entries
 
+\small
 $$
 q_{ij}
 = \frac{1}{\alpha}
@@ -326,12 +314,14 @@ $$
 
 and diagonal entries
 
+\small
 $$
-q_{ii}=-\sum_{j\ne i}q_{ij}.
+q_{ii} = -\sum_{j\ne i}q_{ij}.
 $$
 
 The stationary probabilities solve
 
+\small
 $$
 Q^T\pi=0.
 $$
@@ -361,19 +351,13 @@ This is the cleanest theoretical connection:
 
 > If SGD noise is $\alpha$-stable, Levy metastability predicts more time in wider valleys.
 
-## Figure Placeholder: Two Valleys and Tail Estimator
+## Two Valleys
 
-**Paper Figure 3 placeholder**
-
-Insert the two-panel figure:
-
-- left: objective with two local minima and a separating maximum;
-- right: validation of the tail-index estimator $\widehat{\alpha}$.
-
-Suggested use:
-
-- left panel goes with the stationary probability formula;
-- right panel transitions into the empirical methodology.
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image3.png}
+\caption{An objective with two local minima $m_1$, $m_2$ separated by a local maximum at $s_1 = 0$.}
+\end{figure}
 
 ## Estimating the Tail Index
 
@@ -403,12 +387,11 @@ Then $\widehat{1/\alpha}\to 1/\alpha$ almost surely as $K_2\to\infty$.
 
 ## Proof Sketch: Why the Estimator Works
 
-Stable laws are stable under sums:
+\small
+Stable laws scale under summation:
 
 $$
-X_1+\cdots+X_{K_1}
-\sim
-S\alpha S(K_1^{1/\alpha}\sigma).
+X_1 + \cdots + X_{K_1} \sim S\alpha S(K_1^{1/\alpha}\sigma).
 $$
 
 Taking logs of absolute values, the block sum looks like
@@ -427,7 +410,15 @@ $$
 
 Divide by $\log K_1$, and you estimate $1/\alpha$.
 
-This proof idea is accessible because it uses the defining scaling property of stable laws.
+This proof idea is accessible because it uses the defining scaling property of stable laws.  
+
+## Tail Estimator  
+
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image4.png}
+\caption{Tail-index estimator illustration.}
+\end{figure}
 
 ## Experimental Protocol
 
