@@ -187,6 +187,17 @@ $$
 
 Here $L_t^\alpha$ is an $\alpha$-stable Levy motion.
 
+## Definition of $\alpha$-Stable Levy Motion
+
+In the vector SDE above, each coordinate of $L_t^\alpha$ is an independent scalar $\alpha$-stable Levy motion on $\mathbb{R}$. For $\alpha \in (0,2]$, such a scalar process is determined by:
+
+- **(i)** $L_0^\alpha = 0$ almost surely.
+- **(ii)** For $t_0 < t_1 < \cdots < t_N$, the increments $L_{t_i}^\alpha - L_{t_{i-1}}^\alpha$ are independent ($i = 1,\ldots,N$).
+- **(iii)** For $s < t$, the increment $L_t^\alpha - L_s^\alpha$ has the same law as $L_{t-s}^\alpha$, namely $S\alpha S\big((t-s)^{1/\alpha}\big)$.
+- **(iv)** Stochastic continuity: for every $\delta > 0$ and $s \ge 0$, $\mathbb{P}\big(|L_t^\alpha - L_s^\alpha| > \delta\big) \to 0$ as $t \to s$.
+
+When $\alpha = 2$, $L_t^\alpha$ agrees with $\sqrt{2}\,B_t$ for standard Brownian motion $B_t$.
+
 ## Brownian Motion vs. Levy Motion
 
 | Feature | Brownian motion $B_t$ | Stable Levy motion $L_t^\alpha$ |
@@ -442,55 +453,39 @@ Experiments vary:
 - dataset: MNIST, CIFAR10, CIFAR100;
 - network size, minibatch size, loss function, and random seed.
 
-## Results: Network Size
+## Results: Network Size - FCN Width and Depth
 
-**Paper Figures 4 and 5 placeholders**
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image5.png}
+\caption{Estimation of $\alpha$ for varying widths and depths in FCNs. The curves in the left figures correspond to different depths, and the ones on the right figures correspond to widths.}
+\end{figure}
 
-Insert:
 
-- Figure 4: $\widehat{\alpha}$ for FCNs as width and depth vary;
-- Figure 5: CNN accuracy and $\widehat{\alpha}$ as width varies.
+## Results: Network Size - CNN Width
 
-Main findings:
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image6.png}
+\caption{The accuracy and $\widehat{\alpha}$ of the CNN for varying widths.}
+\end{figure}
 
-- estimated $\alpha$ is far below $2$ in all shown configurations;
-- for MNIST FCNs, larger networks often produce smaller $\alpha$;
-- for CIFAR10 FCNs, $\alpha$ is roughly stable around $1.1$-$1.2$;
-- for CNNs, under-parametrized models have especially low $\alpha$, then stabilize near $1.0$-$1.1$.
-
-Takeaway:
-
-> Gradient noise is consistently heavy-tailed, and the tail index depends on architecture and data.
 
 ## Results: Minibatch Size
 
-**Paper Figure 6 placeholder**
-
-Insert the minibatch-size plots for FCNs.
-
-The common intuition is:
-
-> Larger minibatches should make gradient noise more Gaussian.
-
-But the paper finds:
-
-- increasing minibatch size has little effect on $\widehat{\alpha}$;
-- even large minibatches remain far from $\alpha=2$;
-- training and test accuracies are comparable across these minibatch sizes.
-
-Interpretation:
-
-The usual CLT story may be missing the infinite-variance or heavy-tail structure of the summands.
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image7.png}
+\caption{Estimation of $\alpha$ for varying minibatch size.}
+\end{figure}
 
 ## Results: Evolution During Training
 
-**Paper Figure 7 placeholder**
-
-Insert the iteration-wise plots of:
-
-- estimated $\alpha$;
-- accuracy;
-- loss.
+\begin{figure}
+\centering
+\includegraphics[height=0.56\textheight,keepaspectratio]{www/image8.png}
+\caption{The iteration-wise behavior of $\alpha$ for the FCN.}
+\end{figure}
 
 Observed pattern:
 
@@ -504,6 +499,7 @@ They do not prove whether the jump lands in a different basin or a better part o
 
 ## Brownian Results vs. Levy Results
 
+
 | Question | Brownian model | Levy model |
 |---|---|---|
 | Noise law | Gaussian | $\alpha$-stable |
@@ -514,15 +510,8 @@ They do not prove whether the jump lands in a different basin or a better part o
 | What controls preference? | depth/barrier height dominates | width appears directly |
 | Wide minima story | hard to explain locally | supported by metastability |
 
-The equivalence point:
 
-$$
-\alpha=2
-\quad \Rightarrow \quad
-L_t^\alpha = \sqrt{2}B_t.
-$$
 
-So Brownian motion is not discarded; it is the endpoint of a broader stable-family model.
 
 ## What Is Proven vs. What Is Inferred
 
