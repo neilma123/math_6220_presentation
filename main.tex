@@ -1,0 +1,421 @@
+% --- LaTeX Presentation Template - S. Venkatraman ---
+
+% --- Set document class ---
+
+% Remove "handout" when presenting to include pauses
+\documentclass[dvipsnames, handout]{beamer}
+\usetheme{default}
+
+% Make content that is hidden by pauses "transparent"
+\setbeamercovered{transparent}
+
+% --- Slide layout settings ---
+
+% Set line spacing
+\renewcommand{\baselinestretch}{1.15}
+
+% Set left and right text margins
+\setbeamersize{text margin left=12mm, text margin right=12mm}
+
+% Add slide numbers in bottom right corner
+\setbeamertemplate{footline}[frame number]
+
+% Remove navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% Allow local line spacing changes
+\usepackage{setspace}
+
+% Change itemized list bullets to circles
+\setbeamertemplate{itemize item}{$\bullet$}
+\setbeamertemplate{itemize subitem}{$\circ$}
+
+% --- Color and font settings ---
+
+\usepackage{xcolor}
+
+% Slide title background color
+\definecolor{background}{HTML}{ede6d8}
+
+% Slide title text color
+\definecolor{titleText}{HTML}{B40404}
+
+% Other possible color schemes
+
+% - Light green/dark green -
+%\definecolor{background}{HTML}{e4ede4}
+%\definecolor{titleText}{HTML}{2e592f}
+
+% - Light blue/dark blue -
+%\definecolor{background}{HTML}{d5d9e8}
+%\definecolor{titleText}{HTML}{2d375e}
+
+% - Beige/dark blue -
+%\definecolor{background}{HTML}{e8e2d5}
+%\definecolor{titleText}{HTML}{2d3375}
+
+% Set colors
+\setbeamercolor{frametitle}{bg=background, fg=titleText}
+\setbeamercolor{subtitle}{fg=titleText}
+
+% Set font sizes for frame title and subtitle
+\setbeamerfont{frametitle}{size=\fontsize{15}{16}}
+\setbeamerfont{framesubtitle}{size=\small}
+
+% --- Math/Statistics commands ---
+
+% Add a reference number to a single line of a multi-line equation
+% Usage: "\numberthis\label{labelNameHere}" in an align or gather environment
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+
+% Shortcut for bold text in math mode, e.g. $\b{X}$
+\let\b\mathbf
+
+% Shortcut for bold Greek letters, e.g. $\bg{\beta}$
+\let\bg\boldsymbol
+
+% Shortcut for calligraphic script, e.g. %\mc{M}$
+\let\mc\mathcal
+
+% \mathscr{(letter here)} is sometimes used to denote vector spaces
+\usepackage[mathscr]{euscript}
+
+% Convergence: right arrow with optional text on top
+% E.g. $\converge[p]$ for converges in probability
+\newcommand{\converge}[1][]{\xrightarrow{#1}}
+
+% Weak convergence: harpoon symbol with optional text on top
+% E.g. $\wconverge[n\to\infty]$
+\newcommand{\wconverge}[1][]{\stackrel{#1}{\rightharpoonup}}
+
+% Equality: equals sign with optional text on top
+% E.g. $X \equals[d] Y$ for equality in distribution
+\newcommand{\equals}[1][]{\stackrel{\smash{#1}}{=}}
+
+% Normal distribution: arguments are the mean and variance
+% E.g. $\normal{\mu}{\sigma}$
+\newcommand{\normal}[2]{\mathcal{N}\left(#1,#2\right)}
+
+% Uniform distribution: arguments are the left and right endpoints
+% E.g. $\unif{0}{1}$
+\newcommand{\unif}[2]{\text{Uniform}(#1,#2)}
+
+% Independent and identically distributed random variables
+% E.g. $ X_1,...,X_n \iid \normal{0}{1}$
+\newcommand{\iid}{\stackrel{\smash{\text{iid}}}{\sim}}
+
+% Sequences (this shortcut is mostly to reduce finger strain for small hands)
+% E.g. to write $\{A_n\}_{n\geq 1}$, do $\bk{A_n}{n\geq 1}$
+\newcommand{\bk}[2]{\{#1\}_{#2}}
+
+% Math mode symbols for common sets and spaces. Example usage: $\R$
+\newcommand{\R}{\mathbb{R}}	% Real numbers
+\newcommand{\C}{\mathbb{C}}	% Complex numbers
+\newcommand{\Q}{\mathbb{Q}}	% Rational numbers
+\newcommand{\Z}{\mathbb{Z}}	% Integers
+\newcommand{\N}{\mathbb{N}}	% Natural numbers
+\newcommand{\F}{\mathcal{F}}	% Calligraphic F for a sigma algebra
+\newcommand{\El}{\mathcal{L}}	% Calligraphic L, e.g. for L^p spaces
+
+% Math mode symbols for probability
+\newcommand{\pr}{\mathbb{P}}	% Probability measure
+\newcommand{\E}{\mathbb{E}}	% Expectation, e.g. $\E(X)$
+\newcommand{\var}{\text{Var}}	% Variance, e.g. $\var(X)$
+\newcommand{\cov}{\text{Cov}}	% Covariance, e.g. $\cov(X,Y)$
+\newcommand{\corr}{\text{Corr}}	% Correlation, e.g. $\corr(X,Y)$
+\newcommand{\B}{\mathcal{B}}	% Borel sigma-algebra
+
+% Other miscellaneous symbols
+\newcommand{\tth}{\text{th}}	% Non-italicized 'th', e.g. $n^\tth$
+\newcommand{\Oh}{\mathcal{O}}	% Big-O notation, e.g. $\O(n)$
+\newcommand{\1}{\mathds{1}}	% Indicator function, e.g. $\1_A$
+
+% Additional commands for math mode
+\DeclareMathOperator*{\argmax}{argmax}	% Argmax, e.g. $\argmax_{x\in[0,1]} f(x)$
+\DeclareMathOperator*{\argmin}{argmin}	% Argmin, e.g. $\argmin_{x\in[0,1]} f(x)$
+\DeclareMathOperator*{\spann}{Span}	% Span, e.g. $\spann\{X_1,...,X_n\}$
+\DeclareMathOperator*{\bias}{Bias}	% Bias, e.g. $\bias(\hat\theta)$
+\DeclareMathOperator*{\ran}{ran}		% Range of an operator, e.g. $\ran(T) 
+\DeclareMathOperator*{\dv}{d\!}		% Non-italicized 'with respect to', e.g. $\int f(x) \dv x$
+\DeclareMathOperator*{\diag}{diag}	% Diagonal of a matrix, e.g. $\diag(M)$
+\DeclareMathOperator*{\trace}{trace}	% Trace of a matrix, e.g. $\trace(M)$
+\DeclareMathOperator*{\supp}{supp}	% Support of a function, e.g., $\supp(f)$
+
+% \usepackage{enumitem}
+
+% --- Presentation begins here ---
+
+\begin{document}
+
+% --- Title slide ---
+
+\title{\color{titleText}Presentation title here}
+\subtitle{\color{Blue}Subtitle here (e.g., name of conference)}
+\author{Sara Venkatraman\vspace{-.3cm}}
+\institute{Cornell University, Statistics and Data Science}
+\date{}
+
+\begin{frame}
+\titlepage
+\vspace{-1.2cm}
+\begin{center}
+\includegraphics[width=2.3cm]{Cornell}\bigskip
+{\begin{spacing}{1.2}\scriptsize 
+Joint work with FirstName LastName, FirstName LastName
+\end{spacing}}
+\end{center}
+\end{frame}
+
+% --- Main content ---
+\begin{frame}{Complexity of SGD in Finite Dimensional Space}
+    Consider the unconstrained optimization problem
+    \begin{align*}
+        \min_{x \in \mathbb{R}^n} f(x),
+    \end{align*}
+    where $f$ has a Lipschitz continuous gradient, with constant $L > 0$, that is
+    \begin{align*}
+        \|\nabla f(y) - \nabla f(x)\|_* \leq L \|y - x\|, \quad x,y \in \mathbb{R}^n.
+    \end{align*}
+    Applications:
+    \begin{itemize}
+        \item Neural Networks,
+        \item Parameter estimation (MLE),
+        \item Optimal control, etc.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Complexity of SGD in Finite Dimensional Space}
+    Assuming that at every point $x \in \mathbb{R}^n$, we have access to stochastic gradient vectors:
+    \begin{align*}
+        g(x; \xi) \in \mathbb{R}^n,
+    \end{align*}
+    that satisfy:
+    \begin{itemize}
+        \item \textbf{Unbiased estimator} $\mathbb{E}_{\xi} [g(x; \xi)] = \nabla f(x)$, and
+        \item \textbf{Bounded variance} $\mathbb{E}_{\xi} \left[\|g(x; \xi) - \nabla f(x)\|^2_*\right] \leq \sigma^2$,
+    \end{itemize}
+    then to find a random point $\bar{x}$ using SGD
+    % \begin{align*}
+    %     x_{k+1} = x_k - \frac{1}{L}\, g(x_k, \xi)
+    % \end{align*}
+    such that $\mathbb{E}[\| \nabla f(\bar{x}) \|_*] \leq \epsilon$, it is sufficient to perform
+    \begin{align*}
+        K = \mathcal{O}\left(L (f(x_o) - f^{\star}) \cdot \left[\frac{1}{\epsilon^2} + \frac{\sigma^2}{\epsilon^4}\right]\right),
+    \end{align*}
+    stochastic gradient steps.\\
+    \textcolor{red}{Complexity of SGD is independent of the dimension $n$!}
+    % This the motivation for the use of gradient methods for optimization for large n and infinite dimensional spaces eg. neural nets, inverse problems and function spaces.
+    % And SDG is one of the few optimization methods that have this property.
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space: Preliminaries}
+    Let $E$ and $F$ be Banach spaces, and let $E_o \subset E$ be an open set, a function $f: E_o \rightarrow F$ is said to be Fréchet differentiable at $a \in E_o$ if there exists a bounded linear map \textcolor{red}{$Df(a) \in \mathcal{L}(E, F)$} such that
+    \begin{align*}
+        \lim_{\substack{h \rightarrow 0\\a+h \in E_o}} \frac{\|f(a+h) - f(a) - Df(a)\|_F}{\|h\|_E} = 0,
+    \end{align*}
+    where $\mathcal{L}(E, F)$ is the space of bounded linear operators from $E$ to $F$.\\
+    If $E = H$ for some Hilbert space $H$, and $F = \mathbb{R}$, the operator $Df(a)$ is $H$-valued and we denote it as $\nabla f(a) \in H$.
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space: Preliminaries}
+    % We are interested in studying the impact on the noise on gradient dynamics...\\
+    % We quantify these fluctuations, we characterize the covariance structure of the noise.
+    % For every $\phi \in H$,  we define the covariance operator $Q(\phi): H \rightarrow H$ by
+    A linear operator $Q: H \rightarrow H$ is covariance operator of an $H$-valued random variable $X$ if for all $\phi, \psi \in H$,
+    \begin{align*}
+        \langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle),
+    \end{align*}
+    $\langle X, \phi\rangle$ is a scalar, so $\text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle)$ is understood in the usual sense. If $X$ has mean zero then,
+    \begin{align*}
+        \langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle) = \mathbb{E}[\langle X, \phi\rangle, \langle X, \psi\rangle],
+    \end{align*}
+    and $Q = \mathbb{E}[X \otimes X]$.
+    % $Q(\phi)$ is a \textcolor{red}{bounded} and \textcolor{red}{non-negative selfadjoint} operator in $H$, for any $\phi \in H$.
+\end{frame}
+
+
+\begin{frame}{SGD in Hilbert Space}
+    Consider the following optimization problem
+    \begin{align*}
+        \min_{\phi \in H} \mathcal{F}(\phi) := \mathbb{E}[\mathcal{F}_{\gamma}(\phi)],
+    \end{align*}
+    where $H$ is an infinite dimensional Hilbert space and $\{\mathcal{F}_{\gamma}: \gamma \in \Gamma\}$ is a family of functionals from $H$ to $\mathbb{R}$, and $\gamma$ is the source of uncertainty.\\
+    Gradient Descent for solving this problem,
+    \begin{align*}
+        \phi_{n+1} = \phi_n - \eta \nabla \mathcal{F}(\phi_n) = \phi_n - \eta \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi_n)], \quad n\geq 0,
+    \end{align*}
+    where $\eta > 0$ is the step-size of the learning and $\nabla \mathcal{F}$ is the Fréchet derivative of $\mathcal{F}$.
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space}
+    Computing $\nabla \mathcal{F}(\phi_n) = \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi_n)]$ is expensive, motivating the use of Stochastic Gradients in the updates,
+    \begin{align*}
+        \phi_{n+1} = \phi_n - \eta \textcolor{red}{\nabla \mathcal{F}_{\gamma_n}(\phi_n)}, \quad n\geq 0,
+    \end{align*}
+    $\{\gamma_n\}_{n \geq 0}$ is a sequence of i.i.d random variables with the same distribution as $\gamma$. The SGD updates can be written in perturbation form as:
+    \begin{align}
+        \phi_{n+1} = \underbrace{\phi_n - \eta \nabla \mathcal{F}(\phi_n)}_{\text{exact gradient step}} + \underbrace{\eta V(\phi_n; \gamma_n)}_{\text{noise}}, \quad n\geq 0,
+    \end{align}
+    where $V(\phi_n; \gamma_n) = \nabla \mathcal{F}(\phi) - \nabla \mathcal{F}_{\gamma}(\phi)$.\\
+    By construction, $\mathbb{E}[V(\phi_n; \gamma_n) \;| \; \sigma(\gamma_0, \ldots, \gamma_{n-1})] = 0,$ $n \geq 1$.
+    %stochastic gradients are unbiased of the true gradient.
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space: stochastic modified equation (SME)}
+    We are interested in studying the impact on the noise on gradient dynamics, to this end they propose the following continuous time model for analysis:
+    \begin{align}
+        d\varphi_t = -\nabla \mathcal{F}(\varphi_t)dt + \sqrt{n} \;\sigma(\varphi_t) dB_t,
+    \end{align}
+    where $B_t$ is a cylindrical Wiener process (Brownian motion), and $\sigma$ is to be defined.\\
+    The spaces of $\sigma$ and $B_t$ are to be determined to ensure consistency with SGD. Discretizing of SME using Euler-Maruyama, with step-size $\eta$ (i.e., $t_k = k\eta$),
+    \begin{align}
+        \tilde{\varphi}_{n+1} = \tilde{\varphi}_n - \eta \nabla \mathcal{F}(\tilde{\varphi}_n) + \sqrt{\eta} \; \sigma(\tilde{\varphi}_n)( B_{(n+1)\eta} - B_{n \eta}).
+        % \text{ where } \Delta B_n = B_{(n+1)\eta} - B_{n \eta}
+    \end{align}
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space}
+    Comparing the SGD step (1) and the SME (2), we immediately see that the drift term matches the gradient.\\
+    Comparing the covariance structure, we see that for any $u, v \in H$,
+    \begin{align*}
+        \text{Cov}(\langle \sqrt{\eta} &\; \sigma(\varphi)( B_{(n+1)\eta} - B_{n \eta}), u \rangle, \langle \sqrt{\eta} \; \sigma(\varphi)( B_{(n+1)\eta} - B_{n \eta}), v \rangle)\\
+        &= \eta \; \mathbb{E} \left[\langle B_{(n+1)\eta} - B_{n \eta}, \sigma(\varphi)^*u \rangle \langle B_{(n+1)\eta} - B_{n \eta}, \sigma(\varphi)^*v \rangle\right]\\
+        &= \eta^2 \langle \sigma(\phi) \sigma(\phi)^*u, v \rangle.
+    \end{align*}
+    For the discretization (3) to SGD, we need:
+    \begin{align*}
+        \text{Cov}( \sqrt{\eta} \; \sigma(\varphi)( B_{(n+1)\eta} - B_{n \eta})) = \eta^2 \sigma(\phi) \sigma(\phi)^* &= \eta^2 Q(\phi)\\
+        &= \text{Cov}(\eta V_n (\phi))
+    \end{align*}
+    $\sigma: U \rightarrow H$ is the diffusion kernel of the noise process defined as
+    \begin{align*}
+        \sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma) u(\gamma)], \quad u \in U
+    \end{align*}
+\end{frame}
+
+
+\begin{frame}{SGD in Hilbert Space}
+    Let $U$ and $H$ be separable Hilbert spaces, let $B_t$ be a Brownian motion on $U$, consider a general SME
+    \begin{align*}
+        dX_t = b(X_t)dt + \sigma(X_t) dW_t, \quad X_0 = x \in H.
+    \end{align*}
+    
+    \textbf{Theorem 2.8: } Assume that $b: H \rightarrow H$ and $\sigma: H \rightarrow \mathcal{L}_2(U, H)$ are locally Lipschitz continuous and there exists $c > 0$ such that
+    \begin{align*}
+        \langle b(x), x \rangle_H + \| \sigma(x)\|^2_{\mathcal{L}_2(U,H)} \leq c(1 + \|x\|^2), \quad x \in H.
+    \end{align*}
+    Then for every $x \in H$ there exists a unique global adapted continuous solution $X_t$ with $X_0 = x$. \textcolor{gray}{such that
+    \begin{align*}
+        \mathbb{E} \sup_{t \in [0, T]} \|X_t\|^{2p} \leq c_p (T) (1 + \|x\|^{2p}), \quad \forall T > 0, p\geq 1.
+    \end{align*}}
+\end{frame}
+
+
+
+\begin{frame}{SGD in Hilbert Space: Assumptions}
+    The SME is well-posed if the following assumptions hold:
+    \begin{enumerate}
+    % [label=(A\arabic*)]
+        \item: $\mathcal{F}$ is Fréchet differentiable on H.
+        \item: The initial iterate $\phi_0$ belongs to $H$.
+        \item: For every $\phi \in H$, the stochastic gradients have finite second moment
+        \begin{align*}
+            \mathbb{E}_{\gamma}\left[\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2\right] < \infty.
+        \end{align*}
+        \item: There exists random variables $C_L(\gamma) \in L^2(\Gamma)$ and $C_G(\gamma) \in L^1(\Gamma)$ such that for each $\phi, \psi \in H$,
+        \begin{align*}
+            \|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi) \| &\leq C_L(\gamma) \|\phi - \psi\|,\\ % similar to Lipschitzness of gradients
+            \langle \nabla \mathcal{F}_{\gamma}(\phi), \phi \rangle &\leq C_G(\gamma) (1 + \|\phi\|^2). % the gradient behaves at most linearly in $\phi$.
+        \end{align*}
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{If (A4) holds then the conditions stated in Theorem 2.8 holds, which implies SME (2) is well-posed}
+It is sufficient to show the local Lipschitz continuity and linear growth for both $\nabla \mathcal{F}$ and $\sigma$.
+    
+\end{frame}
+
+\begin{frame}{SGD in Hilbert Space}
+    \textbf{Theorem 3.2:} For every initial condition $\phi_0 \in H$, the SME (2) with the diffusion kernel $\sigma: U \rightarrow H$ defined as
+    \begin{align*}
+        \sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma)u(\gamma)], \quad u \in U,
+    \end{align*}
+    admits a unique adapted strong solution
+    \begin{align*}
+        \phi_t = \phi_0 - \int_0^t \nabla \mathcal{F}(\phi_s) ds + \sqrt{n} \int_0^t \sigma(\phi_s) dB(s), \quad t\geq 0,
+    \end{align*}
+    % X_t depends only on information available by time t or if the solution evolves causally from the noise.
+    such that
+    \begin{align*}
+        \phi \in L^p(\Omega; C([0, T]; H))
+    \end{align*}
+    for every $p \geq 1$ and $T > 0$.
+\end{frame}
+
+
+
+\begin{frame}{SME}
+    The stochastic modified equation of a the form has a unique solution if... we verify that the stochastic modified equation satisfies this condition
+\end{frame}
+
+% Example slide: use \pause to sequentially unveil content
+% \begin{frame}{Mercer's theorem}
+% \framesubtitle{Eigendecomposition of a kernel}
+% A continuous function $K:([0,1]\times[0,1])\to\R$ is a \textit{kernel} if it is: \vspace{-0.4em}
+% \pause
+% \begin{itemize}
+% \item Symmetric: $K(a,b)=K(b,a)$\pause
+% \item Positive semi-definite: $$\sum_{i=1}^n\sum_{j=1}^nK(x_i,x_j)c_ic_j\geq 0$$ for all $x_1,...,x_n\in[0,1]$ and $c_1,...,c_n\in\R$
+% \end{itemize}
+% \pause 
+% Now define an integral operator on $\El^2[0,1]$ using $K$:
+% \begin{align*}
+% (T_Kf)(x) = \int_0^1K(x,s)f(s)\dv s
+% \end{align*}
+% \end{frame}
+
+% Example slide 2: Image
+
+
+% \begin{frame}{Example image}
+% \begin{figure}[H]
+% \centering\includegraphics[width=7cm]{ExampleImage}	
+% \end{figure}
+% \end{frame}
+
+% --- Bibliography slide ---
+
+% \begin{frame}{References}
+% \begin{thebibliography}{10}
+% \beamertemplatearticlebibitems
+% {\small
+
+% \bibitem{Paper1}
+% Paper 1 Title.
+% \newblock Paper 1 Authors. \\
+% {\it Journal Name} Edition, Year.
+
+% \bibitem{Paper 2}
+% Paper 2 Title.
+% \newblock Paper 2 Authors.\\
+% arXiv:1234.56789.
+% }
+% \end{thebibliography}
+% \end{frame}
+
+% --- Thank you slide ---
+
+% \begin{frame}
+% \begin{center}
+% {\large\color{titleText} Thank you for listening!}
+% \vspace{1cm}
+
+% Sara Venkatraman \\[1em]
+% skv24@cornell.edu \\
+% https://sara-venkatraman.github.io
+% \end{center}
+% \end{frame}
+
+% --- Presentation ends here ---
+
+\end{document}
