@@ -1,7 +1,7 @@
 ---
 title: "Heavy-Tailed Gradient Noise and Levy-Driven SGD"
 subtitle: "Simsekli, Sagun, and Gurbuzbalaban (2019). A Tail-Index Analysis of Stochastic Gradient Noise in Deep Neural Networks. arXiv:1901.06053v1."
-author: "Neil Mascarenhas, Gerald Ogbanna, Panos Kounatidis"
+author: "Neil Mascarenhas, Gerald Ogbonna, Panos Kounatidis"
 date: "April 2026"
 format:
   beamer:
@@ -16,6 +16,263 @@ header-includes:
   - \usepackage{amssymb}
   - \usepackage{mathtools}
 ---
+
+
+## Complexity of SGD in Finite Dimensional Space
+
+Consider the unconstrained optimization problem
+
+$$
+\min_{x \in \mathbb{R}^n} f(x),
+$$
+
+where $f$ has a Lipschitz continuous gradient, with constant $L > 0$, that is
+
+$$
+\|\nabla f(y) - \nabla f(x)\|_* \leq L \|y - x\|, \quad x,y \in \mathbb{R}^n.
+$$
+
+Applications:
+
+- Neural Networks,
+- Parameter estimation (MLE),
+- Optimal control, etc.
+
+
+## Complexity of SGD in Finite Dimensional Space
+
+Assuming that at every point $x \in \mathbb{R}^n$, we have access to stochastic gradient vectors:
+
+$$
+g(x; \xi) \in \mathbb{R}^n,
+$$
+
+that satisfy:
+
+- \textbf{Unbiased estimator} $\mathbb{E}_{\xi} [g(x; \xi)] = \nabla f(x)$, and
+- \textbf{Bounded variance} $\mathbb{E}_{\xi} \left[\|g(x; \xi) - \nabla f(x)\|^2_*\right] \leq \sigma^2$,
+
+then to find a random point $\bar{x}$ using SGD such that $\mathbb{E}[\| \nabla f(\bar{x}) \|_*] \leq \epsilon$, it is sufficient to perform
+
+$$
+K = \mathcal{O}\left(L (f(x_o) - f^{\star}) \cdot \left[\frac{1}{\epsilon^2} + \frac{\sigma^2}{\epsilon^4}\right]\right),
+$$
+
+stochastic gradient steps.
+\textcolor{red}{Complexity of SGD is independent of the dimension $n$!}
+
+
+## SGD in Hilbert Space: Preliminaries
+
+Let $E$ and $F$ be Banach spaces, and let $E_o \subset E$ be an open set, a function $f: E_o \rightarrow F$ is said to be Fréchet differentiable at $a \in E_o$ if there exists a bounded linear map \textcolor{red}{$Df(a) \in \mathcal{L}(E, F)$} such that
+
+$$
+\lim_{\substack{h \rightarrow 0\\a+h \in E_o}} \frac{\|f(a+h) - f(a) - Df(a)\|_F}{\|h\|_E} = 0,
+$$
+
+where $\mathcal{L}(E, F)$ is the space of bounded linear operators from $E$ to $F$.
+If $E = H$ for some Hilbert space $H$, and $F = \mathbb{R}$, the operator $Df(a)$ is $H$-valued and we denote it as $\nabla f(a) \in H$.
+
+
+## SGD in Hilbert Space: Preliminaries
+
+A linear operator $Q: H \rightarrow H$ is covariance operator of an $H$-valued random variable $X$ if for all $\phi, \psi \in H$,
+
+$$
+\langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle),
+$$
+
+$\langle X, \phi\rangle$ is a scalar, so $\text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle)$ is understood in the usual sense. If $X$ has mean zero then,
+
+$$
+\langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle) = \mathbb{E}[\langle X, \phi\rangle\langle X, \psi\rangle],
+$$
+
+and $Q = \mathbb{E}[X \otimes X]$.
+
+
+## SGD in Hilbert Space: Preliminaries
+
+In an infinite-dimensional Hilbert space $H$, **Parseval's identity** says that if $\{e_n\}_{n=1}^{\infty}$ is a complete orthonormal basis of $H$, then for every $x \in H$,
+
+$$
+\|x\|^2 = \sum_{n=1}^{\infty} \bigl|\langle x, e_n \rangle\bigr|^2.
+$$
+
+Equivalently,
+
+$$
+x = \sum_{n=1}^{\infty} \langle x, e_n \rangle\, e_n
+$$
+
+with convergence in the Hilbert-space norm.
+
+
+## SGD in Hilbert Space
+
+Consider the following optimization problem
+
+$$
+\min_{\phi \in H} \mathcal{F}(\phi) := \mathbb{E}[\mathcal{F}_{\gamma}(\phi)],
+$$
+
+where $H$ is an infinite dimensional Hilbert space and $\{\mathcal{F}_{\gamma}: \gamma \in \Gamma\}$ is a family of functionals from $H$ to $\mathbb{R}$, and $\gamma$ is the source of uncertainty.  
+
+Gradient Descent for solving this problem,
+
+$$
+\phi_{n+1} = \phi_n - \eta \nabla \mathcal{F}(\phi_n) = \phi_n - \eta \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi_n)], \quad n\geq 0,
+$$
+
+where $\eta > 0$ is the step-size of the learning and $\nabla \mathcal{F}$ is the Fréchet derivative of $\mathcal{F}$.
+
+
+## SGD in Hilbert Space
+
+Computing $\nabla \mathcal{F}(\phi_n) = \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi_n)]$ is expensive, motivating the use of Stochastic Gradients in the updates,
+
+$$
+\phi_{n+1} = \phi_n - \eta \textcolor{red}{\nabla \mathcal{F}_{\gamma_n}(\phi_n)}, \quad n\geq 0,
+$$
+
+$\{\gamma_n\}_{n \geq 0}$ is a sequence of i.i.d random variables with the same distribution as $\gamma$. The SGD updates can be written in perturbation form as:
+
+```{=latex}
+\begin{align}
+        \phi_{n+1} = \underbrace{\phi_n - \eta \nabla \mathcal{F}(\phi_n)}_{\text{exact gradient step}} + \underbrace{\eta V(\phi_n; \gamma_n)}_{\text{noise}}, \quad n\geq 0,
+\end{align}
+```
+
+where $V(\phi_n; \gamma_n) = \nabla \mathcal{F}(\phi_n) - \nabla \mathcal{F}_{\gamma_n}(\phi_n)$.  
+
+By construction, $\mathbb{E}[V(\phi_n; \gamma_n) \;| \; \sigma(\gamma_0, \ldots, \gamma_{n-1})] = 0,$ $n \geq 1$, with covariance operator $Q(\phi_n) = E_{\gamma}[V(\phi_n; \gamma_n) \otimes V(\phi_n; \gamma_n)]$.
+
+
+## SGD in Hilbert Space: stochastic modified equation (SME)
+
+We are interested in studying the impact on the noise on gradient dynamics, to this end they propose the following continuous time model for analysis:
+
+```{=latex}
+\begin{align}
+        d\varphi_t = -\nabla \mathcal{F}(\varphi_t)dt + \sqrt{n} \;\sigma(\varphi_t) dB_t,
+\end{align}
+```
+
+where $B_t$ is a cylindrical Wiener process (Brownian motion on H), and $\sigma$ is to be defined.
+The spaces of $\sigma$ and $B_t$ are to be determined to ensure consistency with SGD. Discretizing of SME using Euler-Maruyama, with step-size $\eta$ (i.e., $t_k = k\eta$),
+
+```{=latex}
+\begin{align}
+        \tilde{\varphi}_{n+1} = \tilde{\varphi}_n - \eta \nabla \mathcal{F}(\tilde{\varphi}_n) + \sqrt{\eta} \; \sigma(\tilde{\varphi}_n)( B_{(n+1)\eta} - B_{n \eta}).
+\end{align}
+```
+
+
+## SGD in Hilbert Space
+\begingroup
+\small
+Comparing the SGD step (1) and the SME (2), the drift term matches the gradient. To match the covariance structure for any $u, v \in H$:
+```{=latex}
+\begin{align*}
+\text{Cov{}}(&\langle \sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta}), u \rangle,\ 
+              \langle \sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta}), v \rangle)\\
+&= \eta\, \mathbb{E}\Big[\langle B_{(n+1)\eta}-B_{n\eta},\sigma(\varphi)^*u\rangle 
+         \langle B_{(n+1)\eta}-B_{n\eta},\sigma(\varphi)^*v\rangle\Big]\\
+&= \eta^2 \langle \sigma(\phi)\sigma(\phi)^*u, v \rangle.
+\end{align*}
+```
+For the discretization (3) to recover SGD, we need:
+```{=latex}
+\begin{align*}
+\text{Cov}\left(\sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta})\right) 
+= \eta^2\, \sigma(\phi)\sigma(\phi)^* = \eta^2 Q(\phi)
+= \text{Cov}(\eta V_n (\phi))
+\end{align*}
+```
+$\sigma: U \rightarrow H$ is the diffusion kernel of the noise process:
+$$
+\sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma) u(\gamma)],\quad u \in U
+$$
+\endgroup
+
+
+## SGD in Hilbert Space
+
+Let $U$ and $H$ be separable Hilbert spaces, let $B_t$ be a Brownian motion on $U$, consider a general SME
+
+$$
+dX_t = b(X_t)dt + \sigma(X_t) dW_t, \quad X_0 = x \in H.
+$$
+
+\textbf{Theorem 2.8: } Assume that $b: H \rightarrow H$ and $\sigma: H \rightarrow \mathcal{L}_2(U, H)$ are locally Lipschitz continuous and there exists $c > 0$ such that
+
+$$
+\langle b(x), x \rangle_H + \| \sigma(x)\|^2_{\mathcal{L}_2(U,H)} \leq c(1 + \|x\|^2), \quad x \in H.
+$$
+
+Then for every $x \in H$ there exists a unique global adapted continuous solution $X_t$ with $X_0 = x$.
+
+
+
+## SGD in Hilbert Space: Assumptions
+
+The SME is well-posed if the following assumptions hold:
+
+```{=latex}
+\begin{enumerate}
+        \item: $\mathcal{F}$ is Fréchet differentiable on H.
+        \item: The initial iterate $\phi_0$ belongs to $H$.
+        \item: For every $\phi \in H$, the stochastic gradients have finite second moment
+        \begin{align*}
+            \mathbb{E}_{\gamma}\left[\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2\right] < \infty.
+        \end{align*}
+        \item: There exists random variables $C_L(\gamma) \in L^2(\Gamma)$ and $C_G(\gamma) \in L^1(\Gamma)$ such that for each $\phi, \psi \in H$,
+        \begin{align*}
+            \|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi) \| &\leq C_L(\gamma) \|\phi - \psi\|,\\
+            \langle \nabla \mathcal{F}_{\gamma}(\phi), \phi \rangle &\leq C_G(\gamma) (1 + \|\phi\|^2).
+        \end{align*}
+    \end{enumerate}
+```
+
+
+## What we are going to prove
+
+If $\textbf{A4:}$  
+There exists random variables $C_L(\gamma) \in L^2(\Gamma)$ and $C_G(\gamma) \in L^1(\Gamma)$ such that for each $\phi, \psi \in H$,
+
+$$
+\begin{aligned}
+\|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi) \| &\leq C_L(\gamma) \|\phi - \psi\|, \\
+\langle \nabla \mathcal{F}_{\gamma}(\phi), \phi \rangle &\leq C_G(\gamma) (1 + \|\phi\|^2),
+\end{aligned}
+$$
+
+$\textbf{then}$ there exists $c > 0$ such that $\langle \nabla \mathcal{F}(\phi), \phi \rangle_H + \| \sigma(\phi)\|^2_{\mathcal{L}_2(U,H)} \leq c(1 + \|\phi\|^2)$, which implies SME $d\varphi_t = -\nabla \mathcal{F}(\varphi_t)dt + \sqrt{n} \;\sigma(\varphi_t) dB_t$ is well-posed
+
+It is sufficient to show the local Lipschitz continuity and linear growth for both $\nabla \mathcal{F}$ and $\sigma$.
+
+
+## SGD in Hilbert Space
+
+\textbf{Theorem 3.2:} For every initial condition $\phi_0 \in H$, the SME (2) with the diffusion kernel $\sigma: U \rightarrow H$ defined as
+
+$$
+\sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma)u(\gamma)], \quad u \in U,
+$$
+
+admits a unique adapted strong solution
+
+$$
+\phi_t = \phi_0 - \int_0^t \nabla \mathcal{F}(\phi_s) ds + \sqrt{n} \int_0^t \sigma(\phi_s) dB(s), \quad t\geq 0,
+$$
+
+such that
+
+$$
+\phi \in L^p(\Omega; C([0, T]; H))
+$$
+
+for every $p \geq 1$ and $T > 0$.
 
 
 ## SGD
@@ -69,13 +326,11 @@ dw_t = -\nabla f(w_t)\,dt + \sqrt{\eta\sigma^2}\,dB_t.
 $$
 
 
-## Why the Paper Challenges This Baseline
+## Issues with the Brownian Model
 
-The Gaussian/Brownian picture has two tensions.
+1. Measured gradient noise in deep nets has much heavier tails than Gaussian noise.
 
-1. Empirical tension: measured gradient noise in deep nets has much heavier tails than Gaussian noise.
-
-2. Theoretical tension: Brownian paths are continuous, so escaping a basin usually means climbing the barrier.
+2. Brownian paths are continuous, so escaping a basin usually means climbing the barrier.
 
 For Brownian-driven small-noise dynamics, first exit times scale roughly like
 
@@ -370,8 +625,7 @@ Experiments vary:
 
 \begin{figure}
 \centering
-\includegraphics[height=0.56\textheight,keepaspectratio]{www/image5.png}
-\caption{Estimation of $\alpha$ for varying widths and depths in FCNs. The curves in the left figures correspond to different depths, and the ones on the right figures correspond to widths.}
+\includegraphics[height=0.80\textheight,keepaspectratio]{www/image5.png}
 \end{figure}
 
 
@@ -379,8 +633,7 @@ Experiments vary:
 
 \begin{figure}
 \centering
-\includegraphics[height=0.56\textheight,keepaspectratio]{www/image6.png}
-\caption{The accuracy and $\widehat{\alpha}$ of the CNN for varying widths.}
+\includegraphics[height=0.80\textheight,keepaspectratio]{www/image6.png}
 \end{figure}
 
 
@@ -388,8 +641,7 @@ Experiments vary:
 
 \begin{figure}
 \centering
-\includegraphics[height=0.56\textheight,keepaspectratio]{www/image7.png}
-\caption{Estimation of $\alpha$ for varying minibatch size.}
+\includegraphics[height=0.80\textheight,keepaspectratio]{www/image7.png}
 \end{figure}
 
 
