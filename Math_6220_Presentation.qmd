@@ -76,23 +76,6 @@ If $E = H$ for some Hilbert space $H$, and $F = \mathbb{R}$, the operator $Df(a)
 
 ## SGD in Hilbert Space: Preliminaries
 
-A linear operator $Q: H \rightarrow H$ is covariance operator of an $H$-valued random variable $X$ if for all $\phi, \psi \in H$,
-
-$$
-\langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle),
-$$
-
-$\langle X, \phi\rangle$ is a scalar, so $\text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle)$ is understood in the usual sense. If $X$ has mean zero then,
-
-$$
-\langle Q \phi, \psi \rangle = \text{Cov}(\langle X, \phi\rangle, \langle X, \psi\rangle) = \mathbb{E}[\langle X, \phi\rangle\langle X, \psi\rangle],
-$$
-
-and $Q = \mathbb{E}[X \otimes X]$.
-
-
-## SGD in Hilbert Space: Preliminaries
-
 In an infinite-dimensional Hilbert space $H$, **Parseval's identity** says that if $\{e_n\}_{n=1}^{\infty}$ is a complete orthonormal basis of $H$, then for every $x \in H$,
 
 $$
@@ -106,6 +89,8 @@ x = \sum_{n=1}^{\infty} \langle x, e_n \rangle\, e_n
 $$
 
 with convergence in the Hilbert-space norm.
+
+
 
 
 ## SGD in Hilbert Space
@@ -131,11 +116,16 @@ where $\eta > 0$ is the step-size of the learning and $\nabla \mathcal{F}$ is th
 
 Computing $\nabla \mathcal{F}(\phi_n) = \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi_n)]$ is expensive, motivating the use of Stochastic Gradients in the updates,
 
+\pause
+
 $$
 \phi_{n+1} = \phi_n - \eta \textcolor{red}{\nabla \mathcal{F}_{\gamma_n}(\phi_n)}, \quad n\geq 0,
 $$
 
+\pause
+
 $\{\gamma_n\}_{n \geq 0}$ is a sequence of i.i.d random variables with the same distribution as $\gamma$. The SGD updates can be written in perturbation form as:
+
 
 ```{=latex}
 \begin{align}
@@ -145,12 +135,13 @@ $\{\gamma_n\}_{n \geq 0}$ is a sequence of i.i.d random variables with the same 
 
 where $V(\phi_n; \gamma_n) = \nabla \mathcal{F}(\phi_n) - \nabla \mathcal{F}_{\gamma_n}(\phi_n)$.  
 
-By construction, $\mathbb{E}[V(\phi_n; \gamma_n) \;| \; \sigma(\gamma_0, \ldots, \gamma_{n-1})] = 0,$ $n \geq 1$, with covariance operator $Q(\phi_n) = E_{\gamma}[V(\phi_n; \gamma_n) \otimes V(\phi_n; \gamma_n)]$.
+By construction, $\mathbb{E}[V(\phi_n; \gamma_n) \;| \; \sigma(\gamma_0, \ldots, \gamma_{n-1})] = 0,$ $n \geq 1$.
 
 
 ## SGD in Hilbert Space: stochastic modified equation (SME)
 
 We are interested in studying the impact on the noise on gradient dynamics, to this end they propose the following continuous time model for analysis:
+
 
 ```{=latex}
 \begin{align}
@@ -158,8 +149,12 @@ We are interested in studying the impact on the noise on gradient dynamics, to t
 \end{align}
 ```
 
-where $B_t$ is a cylindrical Wiener process (Brownian motion on H), and $\sigma$ is to be defined.
-The spaces of $\sigma$ and $B_t$ are to be determined to ensure consistency with SGD. Discretizing of SME using Euler-Maruyama, with step-size $\eta$ (i.e., $t_k = k\eta$),
+where $B_t$ is a cylindrical Wiener process (Brownian motion on $H$), and $\sigma$ is the diffusion kernel of the noise.  
+
+\pause
+
+Discretizing of SME (2) using Euler-Maruyama, with step-size $\eta$ (i.e., $t_k = k\eta$),
+
 
 ```{=latex}
 \begin{align}
@@ -169,32 +164,21 @@ The spaces of $\sigma$ and $B_t$ are to be determined to ensure consistency with
 
 
 ## SGD in Hilbert Space
-\begingroup
-\small
-Comparing the SGD step (1) and the SME (2), the drift term matches the gradient. To match the covariance structure for any $u, v \in H$:
-```{=latex}
-\begin{align*}
-\text{Cov{}}(&\langle \sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta}), u \rangle,\ 
-              \langle \sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta}), v \rangle)\\
-&= \eta\, \mathbb{E}\Big[\langle B_{(n+1)\eta}-B_{n\eta},\sigma(\varphi)^*u\rangle 
-         \langle B_{(n+1)\eta}-B_{n\eta},\sigma(\varphi)^*v\rangle\Big]\\
-&= \eta^2 \langle \sigma(\phi)\sigma(\phi)^*u, v \rangle.
-\end{align*}
-```
-For the discretization (3) to recover SGD, we need:
-```{=latex}
-\begin{align*}
-\text{Cov}\left(\sqrt{\eta}\,\sigma(\varphi)(B_{(n+1)\eta}-B_{n\eta})\right) 
-= \eta^2\, \sigma(\phi)\sigma(\phi)^* = \eta^2 Q(\phi)
-= \text{Cov}(\eta V_n (\phi))
-\end{align*}
-```
-$\sigma: U \rightarrow H$ is the diffusion kernel of the noise process:
-$$
-\sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma) u(\gamma)],\quad u \in U
-$$
-\endgroup
+Comparing the SGD step (1) and the SME (2), we immediately see that the \textbf{drift term} matches the gradient update.  
 
+And if the diffusion kernel $\sigma: U \rightarrow H$ is defined as
+
+
+```{=latex}
+\begin{align*}
+        \sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma) u(\gamma)], \quad u \in U
+\end{align*}
+```
+where $U = L^2(\Gamma)$, the space of random variables with finite 2nd moment.  
+
+$\sigma$ is a Hilbert-Schmidt operator.  
+
+For this choice of $\sigma$, (3) approximates (2) with error $\mathcal{O}(\eta^2)$.
 
 ## SGD in Hilbert Space
 
@@ -247,9 +231,199 @@ $$
 \end{aligned}
 $$
 
-$\textbf{then}$ there exists $c > 0$ such that $\langle \nabla \mathcal{F}(\phi), \phi \rangle_H + \| \sigma(\phi)\|^2_{\mathcal{L}_2(U,H)} \leq c(1 + \|\phi\|^2)$, which implies SME $d\varphi_t = -\nabla \mathcal{F}(\varphi_t)dt + \sqrt{n} \;\sigma(\varphi_t) dB_t$ is well-posed
+$\textbf{then}$ $\nabla \mathcal{F}$ and $\sigma$ are locally Lipschitz and there exists $c > 0$ such that $\langle \nabla \mathcal{F}(\phi), \phi \rangle_H + \| \sigma(\phi)\|^2_{\mathcal{L}_2(U,H)} \leq c(1 + \|\phi\|^2)$, which implies SME $d\phi_t = -\nabla \mathcal{F}(\phi_t)dt + \sqrt{n} \;\sigma(\phi_t) dB_t$ is well-posed
 
-It is sufficient to show the local Lipschitz continuity and linear growth for both $\nabla \mathcal{F}$ and $\sigma$.
+
+## $\nabla \mathcal{F}$ is Local Lipschitz
+
+Consider $\phi, \psi \in H$,
+
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \|\nabla \mathcal{F}(\phi) - \nabla \mathcal{F}(\psi) \| &= \| \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi) ]\|\\
+        \text{using Jensen's inequality }& \text{ and convexity of $\|\cdot\|$,}\\
+        \pause
+        & \leq \mathbb{E}[\|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi)\|]\\
+        \text{using assumption (4),}\qquad&\\
+        & \leq \mathbb{E}[C_L(\gamma) \| \phi - \psi \|] = \mathbb{E}[C_L(\gamma)] \|\phi - \psi \|.\\
+        \text{since }C_L(\gamma) \in L^2(\Gamma), \mathbb{E}[C_{L}(\gamma)^2] &< \infty,\\
+        \text{using Jensen's inequality,}\quad &\\
+        |\mathbb{E}[C_L(\gamma)]|^2& \leq \mathbb{E}[C_{L}(\gamma)^2] < \infty
+    \end{align*}
+```
+
+\pause
+
+Hence $\mathbb{E}[C_L(\gamma)] < \infty$ and $\nabla \mathcal{F}$ is local Lipschitz with constant $\mathbb{E}[C_L(\gamma)]$.
+
+
+## $\nabla \mathcal{F}(\phi)$ has linear growth rate
+
+Compute the inner product,
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \langle \nabla \mathcal{F}(\phi), \phi\rangle &= \langle \mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi)], \phi\rangle = \mathbb{E}[\langle \nabla \mathcal{F}_{\gamma}(\phi), \phi\rangle]
+    \end{align*}
+```
+
+\pause
+
+using assumption (4),
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \mathbb{E}[\langle \nabla \mathcal{F}_{\gamma}(\phi), \phi\rangle] &\leq \mathbb{E}[C_G(\gamma)(1 + \|\phi\|^2)] = \mathbb{E}[C_G(\gamma)](1 + \|\phi\|^2).
+    \end{align*}
+```
+
+\pause
+
+Since $C_G(\gamma) \in L^1(\Gamma)$, $\mathbb{E}[C_G(\gamma)] < \infty$.\\
+Hence $\nabla \mathcal{F}(\phi)$ linear growth rate in $\|\phi\|$.
+
+
+## $\sigma$ is Local Lipschitz
+
+Let $(e_k)$ and $(f_j)$ denote orthonormal basis for the separable Hilbert spaces $U$ and $H$.\\
+For any H-S operator $T: U \rightarrow H$, Hilbert-Schmidt norm
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \|T\|_{\mathcal{L}_2(U, H)}^2 = \sum_k \|Te_k\|^2,
+    \end{align*}
+```
+
+\pause
+
+If $T = \sigma(\phi) - \sigma (\psi)$,
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) - \sigma (\psi) \|_{\mathcal{L}_2(U, H)}^2 &= \sum_k \| (\sigma(\phi) - \sigma (\psi))e_k\|^2
+    \end{align*}
+```
+
+\pause
+
+Recall the diffusion kernel $\sigma: U \rightarrow H$ defined as
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \sigma(\phi)u := \mathbb{E}_{\gamma}[V(\phi; \gamma) u(\gamma)], \quad u \in U = L^2(\Gamma).
+    \end{align*}
+```
+
+
+## $\sigma$ is Local Lipschitz
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) - \sigma (\psi) \|_{\mathcal{L}_2(U, H)}^2 =& \sum_k\|\mathbb{E}_{\gamma}[(V(\phi; \gamma) - V(\psi; \gamma)) e_k(\gamma)]\|^2\\
+        \text{using Parseval's identity, } &\\
+        % \text{and linearity of $\mathbb{E}[\cdot]$,}\\
+        =&\sum_{j,k} \left(\mathbb{E}_{\gamma} \langle (V(\phi; \gamma) - V(\psi; \gamma))e_k(\gamma), f_j\rangle\right)^2\\
+        \text{since $e_k(\gamma)$ is a scalar},\quad &\\
+        =&\sum_{j,k} \left(\mathbb{E}_{\gamma} \langle (V(\phi; \gamma) - V(\psi; \gamma)), f_j\rangle e_k(\gamma) \right)^2\\
+        \text{define a random variable }& a_{j}(\gamma) = \langle (V(\phi; \gamma) - V(\psi; \gamma)), f_j\rangle,\\
+        \text{then } \sum_k(\mathbb{E}[a_j(\gamma) e_k])^2 &= \mathbb{E}|a_j(\gamma)|^2.\\
+        =& \sum_j \mathbb{E}|\langle (V(\phi; \gamma) - V(\psi; \gamma)), f_j\rangle|^2 = \mathbb{E} \|V(\phi; \gamma) - V(\psi; \gamma)\|^2\\
+        &\text{using linearity of $\mathbb{E}[\cdot]$ and parseval's identity.}
+    \end{align*}
+```
+
+
+## $\sigma$ is Local Lipschitz
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) - \sigma (\psi) \|_{\mathcal{L}_2(U, H)}^2 = \mathbb{E} [\|V(\phi; \gamma) - V(\psi; \gamma)\|^2]
+    \end{align*}
+```
+
+\pause
+
+where $V(\phi; \gamma) - V(\psi ; \gamma) = (\nabla \mathcal{F}(\phi) - \nabla \mathcal{F}(\psi)) - (\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi)) = \mathbb{E}_{\gamma}[\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi)] - (\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi))$.\\
+Using the variance identity, $\mathbb{E}[\|X - \mathbb{E}[X]\|^2] = \mathbb{E}[\|X\|^2] - \|\mathbb{E}[X]\|^2 \leq \mathbb{E}[\|X\|^2]$. So,
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) - \sigma (\psi) \|_{\mathcal{L}_2(U, H)}^2 &\leq \mathbb{E} [\|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi)\|^2]\\
+        \text{using assumption (4),}\quad \quad&\\
+        &\leq \mathbb{E}_{\gamma}[C_L(\gamma)^2\|\phi - \psi\|^2] = \mathbb{E}_{\gamma}[C_L(\gamma)^2] \|\phi - \psi\|^2.
+    \end{align*}
+```
+
+\pause
+
+Hence, $\| \sigma(\phi) - \sigma (\psi) \|_{\mathcal{L}_2(U, H)} \leq \sqrt{\mathbb{E}_{\gamma}[C_L(\gamma)^2]} \|\phi - \psi\|$.
+
+
+## $\sigma$ has linear growth rate
+
+Using a similar approach of parseval's identity + orthonormal expansion,
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) \|_{\mathcal{L}_2(U, H)}^2 &= \mathbb{E}[\|V(\phi;\gamma)\|^2] = \mathbb{E}[\| \nabla \mathcal{F}(\phi) - \nabla \mathcal{F}_{\gamma}(\psi) \|^2]\\
+        \text{using the identity}& \|a - b\|^2 \leq 2 \|a\|^2 + 2\|b\|^2,\\
+        &\leq 2 \|\nabla \mathcal{F}(\phi)\|^2 + 2 \mathbb{E}[\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2]\\
+        \text{using Jensen's: } \|\nabla &\mathcal{F}(\phi)\|^2 = \|\mathbb{E}[\nabla \mathcal{F}_{\gamma}(\phi)]\|^2 \leq \mathbb{E}[\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2],\\
+        \| \sigma(\phi) \|_{\mathcal{L}_2(U, H)}^2 &\leq 4\mathbb{E}[\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2]
+    \end{align*}
+```
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \text{ The norm, }\|\nabla \mathcal{F}_{\gamma}(\phi)\|^2 &= \|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(0) + \nabla \mathcal{F}_{\gamma}(0)\|^2\\
+        &\leq 2\|\nabla \mathcal{F}_{\gamma}(\phi) - \nabla \mathcal{F}_{\gamma}(0)\|^2 + 2\|\nabla \mathcal{F}_{\gamma}(0)\|^2\\
+        &\leq 2 C_L(\gamma)^2 \|\phi\|^2 + 2\|\nabla \mathcal{F}_{\gamma}(0)\|^2
+    \end{align*}
+```
+
+\pause
+
+using assumption (4).
+
+
+## $\sigma$ has linear growth rate
+
+Hence,
+
+\pause
+
+```{=latex}
+\begin{align*}
+        \| \sigma(\phi) \|_{\mathcal{L}_2(U, H)}^2 &\leq 4\mathbb{E}[2 C_L(\gamma)^2 \|\phi\|^2 + 2\|\nabla \mathcal{F}_{\gamma}(0)\|^2]\\
+        &= 8\mathbb{E}[ C_L(\gamma)^2] \|\phi\|^2 + 8\mathbb{E}[\|\nabla \mathcal{F}_{\gamma}(0)\|^2]\\
+        &\lesssim 1 + \|\phi\|^2
+    \end{align*}
+```
+
+\pause
+
+i.e. there exists $c > 0$, such that $\| \sigma(\phi) \|_{\mathcal{L}_2(U, H)}^2 \leq c(1 + \|\phi\|^2)$.
 
 
 ## SGD in Hilbert Space
@@ -352,7 +526,7 @@ That makes depth more important than width, which clashes with the folklore that
 
 ## Stable Laws
 
-The generalized central limit theorem says:
+The generalized central limit theorem states:
 
 - finite variance sums $\Rightarrow$ Gaussian limit;
 - heavy-tailed sums with infinite variance $\Rightarrow$ $\alpha$-stable limit.
